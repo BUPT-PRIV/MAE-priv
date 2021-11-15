@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from functools import partial
 
-from timm.models.vision_transformer import Block
+from .vision_transformer import Block
 
 
 class MAE(nn.Module):

@@ -4,7 +4,7 @@ import torch.nn as nn
 from functools import partial, reduce
 from operator import mul
 
-from timm.models.vision_transformer import VisionTransformer, _cfg
+from mae.vision_transformer import VisionTransformer, _cfg
 from timm.models.layers.helpers import to_2tuple
 
 __all__ = [

@@ -7,6 +7,13 @@ import shutil
 import time
 import warnings
 from functools import partial
+import yaml
+
+try:
+    import wandb
+    has_wandb = True
+except ImportError:
+    has_wandb = False
 
 import torch
 import torch.nn as nn
@@ -33,7 +40,9 @@ torchvision_model_names = sorted(name for name in torchvision_models.__dict__
 
 model_names = ['vit_small', 'vit_base', 'vit_large', 'vit_conv_small', 'vit_conv_base'] + torchvision_model_names
 
-parser = argparse.ArgumentParser(description='MAE ImageNet Pre-Training')
+config_parser = parser = argparse.ArgumentParser(description='MAE ImageNet Pre-Training')
+parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
+                    help='YAML config file specifying default arguments')
 parser.add_argument('data', metavar='DIR',
                     help='path to dataset')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='vit_base',
@@ -81,7 +90,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
-# mae specific configs:
+# mae specific cfgs:
 parser.add_argument('--mae-mask-t', default=0.75, type=float,
                     help='mask ratio (default: 0.75)')
 parser.add_argument('--mae-dim', default=256, type=int,
@@ -96,13 +105,32 @@ parser.add_argument('--optimizer', default='lars', type=str,
                     choices=['lars', 'adamw'],
                     help='optimizer used (default: lars)')
 parser.add_argument('--gamma', default=0.95, type=float,
-                    help='mask ratio (default: 0.95)')
+                    help='beta2 of optimizer (default: 0.95)')
 parser.add_argument('--warmup-epochs', default=5, type=int, metavar='N',
                     help='number of warmup epochs')
+parser.add_argument('--log-wandb', action='store_true', default=False,
+                    help='log training and validation metrics to wandb')
+
+
+def _parse_args():
+    # Do we have a config file to parse?
+    args_config, remaining = config_parser.parse_known_args()
+    if args_config.config:
+        with open(args_config.config, 'r') as f:
+            cfg = yaml.safe_load(f)
+            parser.set_defaults(**cfg)
+
+    # The main arg parser parses the rest of the args, the usual
+    # defaults will have been overridden if config file specified.
+    args = parser.parse_args(remaining)
+
+    # Cache the args as a text string to save them in the output dir later
+    args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
+    return args, args_text
 
 
 def main():
-    args = parser.parse_args()
+    args, args_text = _parse_args()
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -251,6 +279,13 @@ def main_worker(gpu, ngpus_per_node, args):
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+
+    if args.log_wandb and args.local_rank == 0:
+        if has_wandb:
+            wandb.init(project=args.wandb_experiment, config=args)
+        else:
+            warnings.warn("You've requested to log metrics to wandb but package not found. "
+                            "Metrics not being logged to wandb, try `pip install wandb`")
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
