@@ -1,0 +1,1 @@
+python main_mae.py -b 4096 --epochs=100 --warmup-epochs=5 --mae-dim=256 --mae-depth=1 --dist-url 'tcp://localhost:10001' --multiprocessing-distributed --world-size 1 --rank 0 ~/Database/ILSVRC2017/Data/CLS-LOC/
