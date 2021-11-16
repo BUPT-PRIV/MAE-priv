@@ -85,5 +85,7 @@ class MAE(nn.Module):
         )  # Bx3x224x224 --> Bx3x16x14x16x14
         # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
         target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1)
+        if self.normalized_pixel:
+            target = F.layer_norm(target, [target.shape[-1]])
 
         return self._mse_loss(decoder_output, target, masked_index=shuffle[self.visible_size:])
