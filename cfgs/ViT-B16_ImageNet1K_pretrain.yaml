@@ -1,20 +1,22 @@
 #dataset: 'torchvision-cifar10'
 num_classes: 1000
-arch: 'vit_base'
 log_wandb: False
 wandb_experiment: 'MAE'
-pretrained: False
 
+# Architecture
+arch: 'vit_base'
+mae-dim: 256
+mae-depth: 1
+mae-norm-p: False
 
+# Training Hyparameter
 weight_decay: 0.05
 optimizer: 'adamw'
 sched: 'cosine'
-epochs: 100
-lr: 0.00015 # base lr = 1.5e-4   lr = 4096 * base_lr / 256
+epochs: 100 # 800
+lr: 0.00015 # lr = 4096 * base_lr / 256
 batch_size: 4096
-warmup_epochs: 5
-warmup_lr: 0.0000024
+warmup_epochs: 5 # 40
 cooldown_epochs: 0
-
 mean: [0.0, 0.0, 0.0]
 std: [1.0, 1.0, 1.0]
