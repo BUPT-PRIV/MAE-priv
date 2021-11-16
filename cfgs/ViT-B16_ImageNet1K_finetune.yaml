@@ -1,0 +1,27 @@
+num_classes: 1000
+model: 'mae_ft_vit_base_patch16_224'
+log_wandb: True
+wandb_experiment: 'MAE-FT'
+
+
+pretrained: 'output/train/mae_vit-b_wo-norm/last.pth.tar'
+
+# Architecture
+arch: 'vit_base'
+
+aa: 'rand-m9-mstd0.5'
+img_size: 224
+mix_up: 0.8
+cut_mix: 1.0
+drop_path: 0.1
+layer_decay: 0.75
+smoothing: 0.1
+
+weight_decay: 0.05
+opt: 'adamw'
+sched: 'cosine'
+epochs: 50
+lr: 0.004 # base lr = 1e-3   lr = 1024 * base_lr / 256
+warmup_epochs: 5
+warmup_lr: 0.000004
+cooldown_epochs: 0

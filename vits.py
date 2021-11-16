@@ -117,6 +117,9 @@ class VisionTransformerDecoder(VisionTransformer):
         encoded_visible_patches = self.norm(encoded_visible_patches)
         return encoded_visible_patches, shuffle
 
+    def get_num_layers(self):
+        return len(self.blocks)
+
 
 class ConvStem(nn.Module):
     """ 

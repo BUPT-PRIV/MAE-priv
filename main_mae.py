@@ -8,6 +8,7 @@ import time
 import warnings
 from functools import partial
 import yaml
+import logging
 
 try:
     import wandb
@@ -30,8 +31,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 import utils
 import mae.builder
-
+from utils import setup_default_logging
 import vits
+
+_logger = logging.getLogger('train')
 
 torchvision_model_names = sorted(name for name in torchvision_models.__dict__
                                  if name.islower() and not name.startswith("__")
@@ -131,6 +134,7 @@ def _parse_args():
 
 
 def main():
+    setup_default_logging()
     args, args_text = _parse_args()
 
     if args.seed is not None:
@@ -189,7 +193,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
         torch.distributed.barrier()
     # create model
-    print("=> creating model '{}'".format(args.arch))
+    if args.rank == 0:
+        _logger.info("=> creating model '{}'".format(args.arch))
     model = mae.builder.MAE(
         partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t),
         decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
@@ -197,9 +202,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # infer learning rate before changing batch size
     args.lr = args.lr * args.batch_size / 256
 
-    if not torch.cuda.is_available():
-        print('using CPU, this will be slow')
-    elif args.distributed:
+    if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
         # should always set the single device scope, otherwise,
         # DistributedDataParallel will use all available devices.
@@ -225,7 +228,9 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         # AllGather/rank implementation in this code only supports DistributedDataParallel.
         raise NotImplementedError("Only DistributedDataParallel is supported.")
-    print(model)  # print model after SyncBatchNorm
+
+    if args.rank == 0:
+        _logger.info(model)  # print model after SyncBatchNorm
 
     if args.optimizer == 'lars':
         optimizer = utils.LARS(model.parameters(), args.lr,
@@ -242,7 +247,8 @@ def main_worker(gpu, ngpus_per_node, args):
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
+            if args.rank == 0:
+                _logger.info("=> loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
                 checkpoint = torch.load(args.resume)
             else:
@@ -253,9 +259,11 @@ def main_worker(gpu, ngpus_per_node, args):
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             scaler.load_state_dict(checkpoint['scaler'])
-            print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
+            if args.rank == 0:
+                _logger.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            if args.rank == 0:
+                _logger.info("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 
@@ -353,7 +361,7 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
+        if i % args.print_freq == 0 and args.rank == 0:
             progress.display(i)
 
 

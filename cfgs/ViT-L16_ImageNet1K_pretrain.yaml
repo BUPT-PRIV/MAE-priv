@@ -3,10 +3,10 @@ log_wandb: True
 wandb_experiment: 'MAE'
 
 # Architecture
-arch: 'vit_base'
-mae_dim: 256
-mae_depth: 1
-mae_norm-p: False
+arch: 'vit_large'
+mae_dim: 512
+mae_depth: 8
+mae_norm_p: False
 
 # Training Hyparameter
 weight_decay: 0.05
@@ -14,7 +14,7 @@ optimizer: 'adamw'
 sched: 'cosine'
 epochs: 100 # 800
 lr: 0.00015 # lr = batch_size * base_lr / 256
-batch_size: 4096
+batch_size: 2048 # 4096
 gamma: 0.95
 warmup_epochs: 5 # 40
 cooldown_epochs: 0

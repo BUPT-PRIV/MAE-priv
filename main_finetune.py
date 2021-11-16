@@ -6,27 +6,29 @@ import random
 import shutil
 import time
 import warnings
-
+import logging
 import torch
-import torch.nn as nn
-import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
-import torch.optim
 import torch.multiprocessing as mp
+import torch.nn as nn
+import torch.nn.parallel
+import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as torchvision_models
-
-from utils import Mixup, LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, ModelEma
+import torchvision.transforms as transforms
 
 import vits
+from utils import rand_augment_transform, Mixup, ModelEma, LayerDecayValueAssigner, SoftTargetCrossEntropy, \
+    create_optimizer, setup_default_logging
+
+_logger = logging.getLogger('train')
 
 torchvision_model_names = sorted(name for name in torchvision_models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(torchvision_models.__dict__[name]))
+                                 if name.islower() and not name.startswith("__")
+                                 and callable(torchvision_models.__dict__[name]))
 
 model_names = ['vit_small', 'vit_base', 'vit_large', 'vit_conv_small', 'vit_conv_base'] + torchvision_model_names
 
@@ -36,8 +38,8 @@ parser.add_argument('data', metavar='DIR',
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet50',
                     choices=model_names,
                     help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: vit_base)')
+                         ' | '.join(model_names) +
+                         ' (default: vit_base)')
 parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=50, type=int, metavar='N',
@@ -85,11 +87,25 @@ parser.add_argument('--pretrained', default='', type=str,
                     help='path to mae encoder pretrained checkpoint')
 parser.add_argument('--warmup-epochs', default=5, type=int, metavar='N',
                     help='number of warmup epochs')
+parser.add_argument('--img-size', default=224, type=int, metavar='N',
+                    help='image size')
+parser.add_argument('--mix-up', default=0.8, type=float, metavar='N',
+                    help='mixup alpha')
+parser.add_argument('--cut-mix', default=1.0, type=float, metavar='N',
+                    help='cutmix alpha')
+parser.add_argument('--smoothing', type=float, default=0.1,
+                    help='Label smoothing (default: 0.1)')
+parser.add_argument('--optimizer', default='adamw', type=str,
+                    choices=['lars', 'adamw'],
+                    help='optimizer used (default: lars)')
+parser.add_argument('--gamma', default=0.999, type=float,
+                    help='beta2 of optimizer (default: 0.95)')
 
-best_acc1 = 0
+best_acc1 = 0.0
 
 
 def main():
+    setup_default_logging()
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -132,10 +148,9 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.multiprocessing_distributed and args.gpu != 0:
         def print_pass(*args):
             pass
+
         builtins.print = print_pass
 
-    if args.gpu is not None:
-        print("Use GPU: {} for training".format(args.gpu))
 
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
@@ -147,8 +162,13 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
         torch.distributed.barrier()
+
+    if args.gpu is not None and args.rank == 0:
+        _logger.info("Use GPU: {} for training".format(args.gpu))
+
     # create model
-    print("=> creating model '{}'".format(args.arch))
+    if args.rank == 0:
+        _logger.info("=> creating model '{}'".format(args.arch))
     if args.arch.startswith('vit'):
         model = vits.__dict__[args.arch]()
         linear_keyword = 'head'
@@ -156,44 +176,40 @@ def main_worker(gpu, ngpus_per_node, args):
         model = torchvision_models.__dict__[args.arch]()
         linear_keyword = 'fc'
 
-    # freeze all layers but the last fc
-    for name, param in model.named_parameters():
-        if name not in ['%s.weight' % linear_keyword, '%s.bias' % linear_keyword]:
-            param.requires_grad = False
-    # init the fc layer
-    getattr(model, linear_keyword).weight.data.normal_(mean=0.0, std=0.01)
-    getattr(model, linear_keyword).bias.data.zero_()
+    model_without_ddp = model
+    num_layers = model_without_ddp.get_num_layers()
+    assigner = LayerDecayValueAssigner(list(args.layer_decay ** (num_layers + 1 - i) for i in range(num_layers + 2)))
 
     # load from pre-trained, before DistributedDataParallel constructor
     if args.pretrained:
         if os.path.isfile(args.pretrained):
-            print("=> loading checkpoint '{}'".format(args.pretrained))
+            if args.rank == 0:
+                _logger.info("=> loading checkpoint '{}'".format(args.pretrained))
             checkpoint = torch.load(args.pretrained, map_location="cpu")
 
             # rename moco pre-trained keys
             state_dict = checkpoint['state_dict']
             for k in list(state_dict.keys()):
                 # retain only base_encoder up to before the embedding layer
-                if k.startswith('module.base_encoder') and not k.startswith('module.base_encoder.%s' % linear_keyword):
+                if k.startswith('module.encoder') and not k.startswith('module.encoder.%s' % linear_keyword):
                     # remove prefix
-                    state_dict[k[len("module.base_encoder."):]] = state_dict[k]
-                # delete renamed or unused k
-                del state_dict[k]
+                    state_dict[k[len("module.encoder."):]] = state_dict[k]
+                if "pos_embed" in k:
+                    del state_dict[k]
 
             args.start_epoch = 0
             msg = model.load_state_dict(state_dict, strict=False)
-            assert set(msg.missing_keys) == {"%s.weight" % linear_keyword, "%s.bias" % linear_keyword}
-
-            print("=> loaded pre-trained model '{}'".format(args.pretrained))
+            if args.rank == 0:
+                # assert set(msg.missing_keys) == {"%s.weight" % linear_keyword, "%s.bias" % linear_keyword}
+                _logger.info("=> loaded pre-trained model '{}'".format(args.pretrained))
+                _logger.info("=> missing_keys: {}".format(msg.missing_keys))
         else:
-            print("=> no checkpoint found at '{}'".format(args.pretrained))
+            raise Exception("=> no checkpoint found at '{}'".format(args.pretrained))
 
     # infer learning rate before changing batch size
     init_lr = args.lr * args.batch_size / 256
 
-    if not torch.cuda.is_available():
-        print('using CPU, this will be slow')
-    elif args.distributed:
+    if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
         # should always set the single device scope, otherwise,
         # DistributedDataParallel will use all available devices.
@@ -211,6 +227,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # DistributedDataParallel will divide and allocate batch_size to all
             # available GPUs if device_ids are not set
             model = torch.nn.parallel.DistributedDataParallel(model)
+        model_without_ddp = model.module
     elif args.gpu is not None:
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
@@ -222,21 +239,17 @@ def main_worker(gpu, ngpus_per_node, args):
         else:
             model = torch.nn.DataParallel(model).cuda()
 
-    # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda(args.gpu)
-
-    # optimize only the linear classifier
-    parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-    assert len(parameters) == 2  # weight, bias
-
-    optimizer = torch.optim.SGD(parameters, init_lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
+    optimizer = create_optimizer(
+        args, model_without_ddp,
+        get_num_layer=assigner.get_layer_id if assigner is not None else None,
+        get_layer_scale=assigner.get_scale if assigner is not None else None
+    )
 
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
+            if args.rank == 0:
+                _logger.info("=> loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
                 checkpoint = torch.load(args.resume)
             else:
@@ -250,27 +263,35 @@ def main_worker(gpu, ngpus_per_node, args):
                 best_acc1 = best_acc1.to(args.gpu)
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.resume, checkpoint['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 
     # Data loading code
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     train_dataset = datasets.ImageFolder(
         traindir,
         transforms.Compose([
-            transforms.RandomResizedCrop(224),
+            transforms.RandomResizedCrop(args.img_size),
             transforms.RandomHorizontalFlip(),
+            rand_augment_transform(args.aa, dict(
+                translate_const=int(args.img_size * 0.45),
+                img_mean=tuple([min(255, round(255 * x)) for x in args.mean]),
+            )),
             transforms.ToTensor(),
             normalize,
         ]))
+
+    if args.mixup > 0 or args.cutmix > 0.:
+        mixup_args = dict(
+            mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=None,
+            prob=1.0, switch_prob=0.5, mode="batch",
+            label_smoothing=args.smoothing, num_classes=args.num_classes)
+        mixup_fn = Mixup(**mixup_args)
+    else:
+        mixup_fn = None
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -291,6 +312,9 @@ def main_worker(gpu, ngpus_per_node, args):
         batch_size=256, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
+    # define loss function (criterion) and optimizer
+    criterion = SoftTargetCrossEntropy.cuda(args.gpu)
+
     if args.evaluate:
         validate(val_loader, model, criterion, args)
         return
@@ -301,7 +325,7 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, init_lr, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args)
+        train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn)
 
         # evaluate on validation set
         acc1 = validate(val_loader, model, criterion, args)
@@ -311,19 +335,19 @@ def main_worker(gpu, ngpus_per_node, args):
         best_acc1 = max(acc1, best_acc1)
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank == 0): # only the first GPU saves checkpoint
+                                                    and args.rank == 0):  # only the first GPU saves checkpoint
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
-                'optimizer' : optimizer.state_dict(),
+                'optimizer': optimizer.state_dict(),
             }, is_best)
             if epoch == args.start_epoch:
                 sanity_check(model.state_dict(), args.pretrained, linear_keyword)
 
 
-def train(train_loader, model, criterion, optimizer, epoch, args):
+def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -352,6 +376,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             images = images.cuda(args.gpu, non_blocking=True)
         if torch.cuda.is_available():
             target = target.cuda(args.gpu, non_blocking=True)
+        if mixup_fn is not None:
+            images, target = mixup_fn(images, target)
 
         # compute output
         output = model(images)
@@ -453,6 +479,7 @@ def sanity_check(state_dict, pretrained_weights, linear_keyword):
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self, name, fmt=':f'):
         self.name = name
         self.fmt = fmt
