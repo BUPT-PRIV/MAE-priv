@@ -5,7 +5,7 @@ from functools import partial, reduce
 from operator import mul
 
 from mae.vision_transformer import VisionTransformer
-from mae.helpers import to_2tuple
+from mae.layers import to_2tuple
 
 __all__ = [
     'vit_small',

@@ -16,7 +16,6 @@ except ImportError:
     has_wandb = False
 
 import torch
-import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
@@ -29,8 +28,8 @@ import torchvision.datasets as datasets
 import torchvision.models as torchvision_models
 from torch.utils.tensorboard import SummaryWriter
 
+import utils
 import mae.builder
-import mae.optimizer
 
 import vits
 
@@ -229,7 +228,7 @@ def main_worker(gpu, ngpus_per_node, args):
     print(model)  # print model after SyncBatchNorm
 
     if args.optimizer == 'lars':
-        optimizer = mae.optimizer.LARS(model.parameters(), args.lr,
+        optimizer = utils.LARS(model.parameters(), args.lr,
                                        weight_decay=args.weight_decay,
                                        momentum=args.momentum)
     elif args.optimizer == 'adamw':
