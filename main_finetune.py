@@ -20,9 +20,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as torchvision_models
 
-from timm.data.mixup import Mixup
-from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from timm.utils import ModelEma
+from utils import Mixup, LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, ModelEma
 
 import vits
 
