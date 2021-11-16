@@ -176,11 +176,9 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.multiprocessing_distributed and (args.gpu != 0 or args.rank != 0):
         def print_pass(*args):
             pass
-
         builtins.print = print_pass
 
-    if args.gpu is not None:
-        print("Use GPU: {} for training".format(args.gpu))
+    print("Use GPU: {} for training".format(args.gpu))
 
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
@@ -193,8 +191,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
         torch.distributed.barrier()
     # create model
-    if args.rank == 0:
-        _logger.info("=> creating model '{}'".format(args.arch))
+    print("=> creating model '{}'".format(args.arch))
     model = mae.builder.MAE(
         partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t),
         decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
@@ -229,8 +226,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # AllGather/rank implementation in this code only supports DistributedDataParallel.
         raise NotImplementedError("Only DistributedDataParallel is supported.")
 
-    if args.rank == 0:
-        _logger.info(model)  # print model after SyncBatchNorm
+    print(model)  # print model after SyncBatchNorm
 
     if args.optimizer == 'lars':
         optimizer = utils.LARS(model.parameters(), args.lr,
@@ -247,8 +243,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            if args.rank == 0:
-                _logger.info("=> loading checkpoint '{}'".format(args.resume))
+            print("=> loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
                 checkpoint = torch.load(args.resume)
             else:
@@ -259,11 +254,9 @@ def main_worker(gpu, ngpus_per_node, args):
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             scaler.load_state_dict(checkpoint['scaler'])
-            if args.rank == 0:
-                _logger.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
+            print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
-            if args.rank == 0:
-                _logger.info("=> no checkpoint found at '{}'".format(args.resume))
+            print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 
@@ -289,7 +282,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
 
-    if args.log_wandb and args.local_rank == 0:
+    if args.log_wandb and args.rank == 0:
         if has_wandb:
             wandb.init(project=args.wandb_experiment, config=args)
         else:

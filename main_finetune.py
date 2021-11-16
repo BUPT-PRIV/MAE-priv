@@ -163,12 +163,11 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
         torch.distributed.barrier()
 
-    if args.gpu is not None and args.rank == 0:
-        _logger.info("Use GPU: {} for training".format(args.gpu))
+    if args.gpu is not None:
+        print("Use GPU: {} for training".format(args.gpu))
 
     # create model
-    if args.rank == 0:
-        _logger.info("=> creating model '{}'".format(args.arch))
+    print("=> creating model '{}'".format(args.arch))
     if args.arch.startswith('vit'):
         model = vits.__dict__[args.arch]()
         linear_keyword = 'head'
@@ -199,10 +198,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
             args.start_epoch = 0
             msg = model.load_state_dict(state_dict, strict=False)
-            if args.rank == 0:
-                # assert set(msg.missing_keys) == {"%s.weight" % linear_keyword, "%s.bias" % linear_keyword}
-                _logger.info("=> loaded pre-trained model '{}'".format(args.pretrained))
-                _logger.info("=> missing_keys: {}".format(msg.missing_keys))
+            # assert set(msg.missing_keys) == {"%s.weight" % linear_keyword, "%s.bias" % linear_keyword}
+            print("=> loaded pre-trained model '{}'".format(args.pretrained))
+            print("=> missing_keys: {}".format(msg.missing_keys))
         else:
             raise Exception("=> no checkpoint found at '{}'".format(args.pretrained))
 
@@ -248,8 +246,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            if args.rank == 0:
-                _logger.info("=> loading checkpoint '{}'".format(args.resume))
+            print("=> loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
                 checkpoint = torch.load(args.resume)
             else:
