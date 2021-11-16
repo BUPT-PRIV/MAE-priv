@@ -1,0 +1,16 @@
+#dataset: 'torchvision-cifar10'
+num_classes: 1000
+arch: 'vit_base'
+log_wandb: False
+wandb_experiment: 'MAE'
+pretrained: False
+
+
+weight_decay: 0.05
+opt: 'adamw'
+sched: 'cosine'
+epochs: 100
+lr: 0.0024 # base lr = 1.5e-4   lr = 4096 * base_lr / 256
+warmup_epochs: 5
+warmup_lr: 0.0000024
+cooldown_epochs: 0

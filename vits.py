@@ -4,8 +4,8 @@ import torch.nn as nn
 from functools import partial, reduce
 from operator import mul
 
-from mae.vision_transformer import VisionTransformer, _cfg
-from timm.models.layers.helpers import to_2tuple
+from mae.vision_transformer import VisionTransformer
+from mae.helpers import to_2tuple
 
 __all__ = [
     'vit_small',
@@ -14,6 +14,15 @@ __all__ = [
     'vit_conv_small',
     'vit_conv_base',
 ]
+
+def _cfg(url='', **kwargs):
+    return {
+        'url': url,
+        'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
+        'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
+        'first_conv': 'patch_embed.proj', 'classifier': 'head',
+        **kwargs
+    }
 
 
 class PatchEmbed(nn.Module):
