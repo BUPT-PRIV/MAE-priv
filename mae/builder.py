@@ -27,7 +27,7 @@ class MAE(nn.Module):
 
         # build dim_proj
         # Bx(14*14*0.75)x512 = Bx147x512
-        self.mask_token = nn.Parameter(torch.zeros(1, self.num_patches - self.visible_size, decoder_dim))
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
         self.dim_proj = nn.Linear(self.encoder.embed_dim, decoder_dim)
         self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(embed_dim=decoder_dim)
 
@@ -71,7 +71,7 @@ class MAE(nn.Module):
         # un-shuffle  with positional embedding
         encoded_visible_patches = self.dim_proj(encoded_visible_patches)  # Bx49x768 --> Bx49x512
         decoder_input = torch.cat(
-            [encoded_visible_patches, self.mask_token.repeat([B, 1, 1])], dim=1
+            [encoded_visible_patches, self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])], dim=1
         )[:, shuffle.sort()[1], :]  # Bx49x512 + Bx147x512 --> Bx196x512
         decoder_input = decoder_input + self.decoder_pos_embed
 
