@@ -1,7 +1,7 @@
 ## MAE for Self-supervised ViT
 
 ### Introduction
-This is an unofficial PyTorch implementation of [MAE](https://arxiv.org/abs/2111.06377) for self-supervised ViT.
+This is an unofficial PyTorch implementation of [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377) for self-supervised ViT.
 
 This repo is mainly based on [moco-v3](https://github.com/facebookresearch/moco-v3), [pytorch-image-models](https://github.com/rwightman/pytorch-image-models) and [BEiT](https://github.com/microsoft/unilm/tree/master/beit)
 
