@@ -439,7 +439,7 @@ def validate(val_loader, model, criterion, args, epoch=None):
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        len(val_loader),
+        len(val_loader), epoch,
         [batch_time, losses, top1, top5],
         prefix='Test: ')
 
