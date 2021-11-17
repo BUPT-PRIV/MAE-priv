@@ -348,7 +348,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1 = validate(val_loader, model, criterion, args, epoch)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -419,10 +419,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
         end = time.time()
 
         if i % args.print_freq == 0:
-            progress.display(i)
+            progress.display(i, args.rank)
 
 
-def validate(val_loader, model, criterion, args):
+def validate(val_loader, model, criterion, args, epoch=None):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -463,6 +463,8 @@ def validate(val_loader, model, criterion, args):
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
+        if args.rank == 0:
+            wandb.log({'top1': top1.avg, 'top5': top5.avg, 'epoch':epoch})
 
     return top1.avg
 
@@ -530,13 +532,14 @@ class ProgressMeter(object):
         self.meters = meters
         self.prefix = prefix
 
-    def display(self, batch):
+    def display(self, batch, rank):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
         result = dict()
         for m in self.meters:
             result[m.name] = m.val
-        wandb.log(result, step=self.get_iterations(batch))
+        if rank == 0:
+            wandb.log(result, step=self.get_iterations(batch))
         print('\t'.join(entries))
 
     def get_iterations(self, batch):
