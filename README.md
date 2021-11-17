@@ -30,6 +30,12 @@ The following results are based on ImageNet-1k self-supervised pre-training, fol
 <td align="center">--</td>
 <td align="center">77.19</td>
 </tr>
+<tr>
+<td align="right">800</td>
+<td align="center">True</td>
+<td align="center">--</td>
+<td align="center">--</td>
+</tr>
 </tbody></table>
 
 On 8 NVIDIA GeForce 3090 GPUs, pretrain for 100 epochs needs about xx hours, 4096 batch size needs about xx GB GPU memory.
@@ -141,14 +147,6 @@ python main_lincls.py \
   [your imagenet-folder with train and val folders]
 ```
 
-
-### Model Configs
-
-See the commands listed in [CONFIG.md](https://github.com/facebookresearch/moco-v3/blob/main/CONFIG.md) for specific model configs, including our recommended hyper-parameters and pre-trained reference models.
-
-### Transfer Learning
-
-See the instructions in the [transfer](https://github.com/facebookresearch/moco-v3/tree/main/transfer) dir.
 
 ### License
 
