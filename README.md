@@ -81,11 +81,7 @@ Below is examples for MAE pre-training.
 
 ```
 python main_mae.py \
-  -a vit_base -b 4096 \
-  --optimizer=adamw --lr=1.5e-4 --weight-decay=.1 \
-  --epochs=300 --warmup-epochs=40 \
-  --stop-grad-conv1 --moco-m-cos --moco-t=.2 \
-  --dist-url 'tcp://localhost:10001' \
+  -c cfgs/ViT-B16_ImageNet1K_pretrain.yaml \
   --multiprocessing-distributed --world-size 1 --rank 0 \
   [your imagenet-folder with train and val folders]
 ```
@@ -94,11 +90,7 @@ python main_mae.py \
 
 ```
 python main_mae.py \
-  -a vit_large -b 2048 \
-  --optimizer=adamw --lr=1.5e-4 --weight-decay=.1 \
-  --epochs=300 --warmup-epochs=40 \
-  --stop-grad-conv1 --moco-m-cos --moco-t=.2 \
-  --dist-url 'tcp://localhost:10001' \
+  -c cfgs/ViT-L16_ImageNet1K_pretrain.yaml \
   --multiprocessing-distributed --world-size 1 --rank 0 \
   [your imagenet-folder with train and val folders]
 ```
@@ -117,17 +109,11 @@ Below is examples for MAE fine-tuning.
 #### Vit-Base with 1-node (8-GPU, NVIDIA GeForce 3090) training, batch 4096
 
 ```
-python main_mae.py \
-  -a vit_base -b 4096 \
-  --optimizer=adamw --lr=1.5e-4 --weight-decay=.1 \
-  --epochs=300 --warmup-epochs=40 \
-  --stop-grad-conv1 --moco-m-cos --moco-t=.2 \
-  --dist-url 'tcp://localhost:10001' \
+python main_fintune.py \
+  -c cfgs/ViT-B16_ImageNet1K_finetune.yaml \
   --multiprocessing-distributed --world-size 1 --rank 0 \
   [your imagenet-folder with train and val folders]
 ```
-
-This gives us 83.2% accuracy for ViT-Base with 100-epoch fine-tuning.
 
 **Note**:
 1. We use `--resume` rather than `--finetune` in the DeiT repo, as its `--finetune` option trains under eval mode. When loading the pre-trained model, revise `model_without_ddp.load_state_dict(checkpoint['model'])` with `strict=False`.

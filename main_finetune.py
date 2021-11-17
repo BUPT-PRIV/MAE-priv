@@ -150,6 +150,8 @@ def main():
 
     args.lr = args.lr * args.batch_size * args.world_size / 256
 
+    args.distributed = args.world_size > 1 or args.multiprocessing_distributed
+
     ngpus_per_node = torch.cuda.device_count()
     if args.multiprocessing_distributed:
         # Since we have ngpus_per_node processes per node, the total world_size
@@ -439,7 +441,7 @@ def validate(val_loader, model, criterion, args, epoch=None):
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        len(val_loader),
+        len(val_loader), epoch,
         [batch_time, losses, top1, top5],
         prefix='Test: ')
 
@@ -469,7 +471,7 @@ def validate(val_loader, model, criterion, args, epoch=None):
             end = time.time()
 
             if i % args.print_freq == 0:
-                progress.display(i)
+                progress.display(i, args.rank)
 
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
