@@ -12,11 +12,11 @@ mae_norm-p: False
 weight_decay: 0.05
 optimizer: 'adamw'
 sched: 'cosine'
-epochs: 100 # 800
+epochs: 400 # 800
 lr: 0.00015 # lr = batch_size * base_lr / 256
 batch_size: 4096
 gamma: 0.95
-warmup_epochs: 5 # 40
+warmup_epochs: 40 # 40
 cooldown_epochs: 0
 mean: [0.0, 0.0, 0.0]
 std: [1.0, 1.0, 1.0]
