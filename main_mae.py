@@ -197,7 +197,7 @@ def main_worker(gpu, ngpus_per_node, args):
         decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
 
     # infer learning rate before changing batch size
-    args.lr = args.lr * args.batch_size * args.world_size / 256
+    args.lr = args.lr * args.batch_size / 256
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor

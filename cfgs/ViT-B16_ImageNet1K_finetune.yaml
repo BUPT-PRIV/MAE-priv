@@ -3,7 +3,6 @@ model: 'mae_ft_vit_base_patch16_224'
 log_wandb: True
 wandb_experiment: 'MAE-FT'
 
-
 pretrained: 'output/train/mae_vit-b_wo-norm/last.pth.tar'
 
 # Architecture
@@ -20,6 +19,7 @@ smoothing: 0.1
 weight_decay: 0.05
 opt: 'adamw'
 sched: 'cosine'
+batch_size: 1024
 epochs: 50
 lr: 0.001 # base lr = 1e-3   lr = 1024 * base_lr / 256
 warmup_epochs: 5

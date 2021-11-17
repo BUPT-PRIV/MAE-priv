@@ -17,7 +17,7 @@ drop_path: 0.1
 layer_decay: 0.75
 smoothing: 0.1
 
-batch_size: 64 #1024
+batch_size: 1024 #1024
 weight_decay: 0.05
 opt: 'adamw'
 sched: 'cosine'
