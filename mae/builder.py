@@ -35,6 +35,7 @@ class MAE(nn.Module):
         self.decoder = self._build_decoder(
             decoder_dim=decoder_dim, decoder_head=decoder_dim // 64, decoder_depth=decoder_depth
         )
+        self.decoder_norm = nn.LayerNorm(decoder_dim, eps=1e-6)
         self.decoder_linear_proj = nn.Linear(decoder_dim, self.patch_size[0] * self.patch_size[1] * 3)
 
         # weight initialization
@@ -77,11 +78,12 @@ class MAE(nn.Module):
 
         # decode (encoded_visible_patches + mask_token)
         decoder_output = self.decoder(decoder_input)  # Bx(14*14)x512
+        decoder_output = self.decoder_norm(decoder_output)
         decoder_output = self.decoder_linear_proj(decoder_output)  # Bx(14*14)x512 --> Bx(14*14)x(16*16*3)
 
         # target
         target = x.view(
-            [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[0]]
+            [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[1]]
         )  # Bx3x224x224 --> Bx3x16x14x16x14
         # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
         target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1)
