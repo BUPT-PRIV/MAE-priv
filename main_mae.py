@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import builtins
 import math
 import os
@@ -289,6 +290,13 @@ def main_worker(gpu, ngpus_per_node, args):
             warnings.warn("You've requested to log metrics to wandb but package not found. "
                             "Metrics not being logged to wandb, try `pip install wandb`")
 
+    if args.rank == 0:
+        ckpt = 'output/' + '-'.join(['pretrain',
+                args.arch,
+                datetime.now().strftime("%Y%m%d-%H%M%S"),])
+        if not os.path.exists(ckpt):
+            os.mkdir(ckpt)
+
     train_start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -305,7 +313,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'scaler': scaler.state_dict(),
-            }, is_best=False, filename='checkpoint_%04d.pth.tar' % epoch)
+            }, is_best=False, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
 
             print('>> ETA: {:.2f}min'.format(
                 (time.time()-train_start_time)*(args.epochs-epoch)/(epoch-args.start_epoch+1)/60
