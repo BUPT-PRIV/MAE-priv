@@ -21,7 +21,6 @@ weight_decay: 0.05
 opt: 'adamw'
 sched: 'cosine'
 epochs: 50
-lr: 0.004 # base lr = 1e-3   lr = 1024 * base_lr / 256
+lr: 0.001 # base lr = 1e-3   lr = 1024 * base_lr / 256
 warmup_epochs: 5
 warmup_lr: 0.000004
-cooldown_epochs: 0

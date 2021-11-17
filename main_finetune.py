@@ -19,8 +19,9 @@ import torch.utils.data.distributed
 import torchvision.datasets as datasets
 import torchvision.models as torchvision_models
 import torchvision.transforms as transforms
-
-import vits
+import wandb
+import yaml
+import mae.mae_ft_vision_transformer as vits
 from utils import rand_augment_transform, Mixup, ModelEma, LayerDecayValueAssigner, SoftTargetCrossEntropy, \
     create_optimizer, setup_default_logging
 
@@ -29,6 +30,10 @@ _logger = logging.getLogger('train')
 torchvision_model_names = sorted(name for name in torchvision_models.__dict__
                                  if name.islower() and not name.startswith("__")
                                  and callable(torchvision_models.__dict__[name]))
+
+config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)
+parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
+                    help='YAML config file specifying default arguments')
 
 model_names = ['vit_small', 'vit_base', 'vit_large', 'vit_conv_small', 'vit_conv_base'] + torchvision_model_names
 
@@ -68,7 +73,7 @@ parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')
 parser.add_argument('--rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
+parser.add_argument('--dist-url', default='tcp://localhost:10001', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
@@ -100,13 +105,30 @@ parser.add_argument('--optimizer', default='adamw', type=str,
                     help='optimizer used (default: lars)')
 parser.add_argument('--gamma', default=0.999, type=float,
                     help='beta2 of optimizer (default: 0.95)')
+parser.add_argument('--log-wandb', action='store_true', default=False,
+                    help='log training and validation metrics to wandb')
 
 best_acc1 = 0.0
 
+def _parse_args():
+    # Do we have a config file to parse?
+    args_config, remaining = config_parser.parse_known_args()
+    if args_config.config:
+        with open(args_config.config, 'r') as f:
+            cfg = yaml.safe_load(f)
+            parser.set_defaults(**cfg)
+
+    # The main arg parser parses the rest of the args, the usual
+    # defaults will have been overridden if config file specified.
+    args = parser.parse_args(remaining)
+
+    # Cache the args as a text string to save them in the output dir later
+    args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
+    return args, args_text
 
 def main():
     setup_default_logging()
-    args = parser.parse_args()
+    args, args_text = _parse_args()
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -148,9 +170,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.multiprocessing_distributed and args.gpu != 0:
         def print_pass(*args):
             pass
-
         builtins.print = print_pass
-
 
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
@@ -201,12 +221,13 @@ def main_worker(gpu, ngpus_per_node, args):
             # assert set(msg.missing_keys) == {"%s.weight" % linear_keyword, "%s.bias" % linear_keyword}
             print("=> loaded pre-trained model '{}'".format(args.pretrained))
             print("=> missing_keys: {}".format(msg.missing_keys))
+            print("=> unexpected_keys: {}".format(msg.unexpected_keys))
         else:
             raise Exception("=> no checkpoint found at '{}'".format(args.pretrained))
 
     # infer learning rate before changing batch size
-    init_lr = args.lr * args.batch_size / 256
-
+    args.lr = args.lr * args.batch_size * args.world_size * ngpus_per_node / 256
+    print("=> learning rate: ",  args.lr)
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
         # should always set the single device scope, otherwise,
@@ -266,7 +287,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # Data loading code
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=args.mean, std=args.std)
 
     train_dataset = datasets.ImageFolder(
         traindir,
@@ -310,16 +331,18 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True)
 
     # define loss function (criterion) and optimizer
-    criterion = SoftTargetCrossEntropy.cuda(args.gpu)
+    criterion = SoftTargetCrossEntropy().cuda(args.gpu)
 
     if args.evaluate:
         validate(val_loader, model, criterion, args)
         return
 
+    if args.log_wandb and args.rank == 0:
+        wandb.init(project=args.wandb_experiment, config=args)
+
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        adjust_learning_rate(optimizer, init_lr, epoch, args)
 
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn)
@@ -347,12 +370,11 @@ def main_worker(gpu, ngpus_per_node, args):
 def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
+    learning_rates = AverageMeter('LR', ':.4e')
     losses = AverageMeter('Loss', ':.4e')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        len(train_loader),
-        [batch_time, data_time, losses, top1, top5],
+        len(train_loader), epoch,
+        [batch_time, data_time, learning_rates, losses],
         prefix="Epoch: [{}]".format(epoch))
 
     """
@@ -362,12 +384,16 @@ def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
     BatchNorm in train mode may revise running mean/std (even if it receives
     no gradient), which are part of the model parameters too.
     """
-    model.eval()
-
+    model.train()
     end = time.time()
+    iters_per_epoch = len(train_loader)
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
+
+        # adjust learning rate and momentum coefficient per iteration
+        lr = adjust_learning_rate(optimizer, epoch + i / iters_per_epoch, args)
+        learning_rates.update(lr)
 
         if args.gpu is not None:
             images = images.cuda(args.gpu, non_blocking=True)
@@ -381,10 +407,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
         loss = criterion(output, target)
 
         # measure accuracy and record loss
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
         losses.update(loss.item(), images.size(0))
-        top1.update(acc1[0], images.size(0))
-        top5.update(acc5[0], images.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -500,15 +523,24 @@ class AverageMeter(object):
 
 
 class ProgressMeter(object):
-    def __init__(self, num_batches, meters, prefix=""):
+    def __init__(self, num_batches, epoch, meters, prefix=""):
         self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
+        self.num_batches = num_batches
+        self.epoch = epoch
         self.meters = meters
         self.prefix = prefix
 
     def display(self, batch):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
+        result = dict()
+        for m in self.meters:
+            result[m.name] = m.val
+        wandb.log(result, step=self.get_iterations(batch))
         print('\t'.join(entries))
+
+    def get_iterations(self, batch):
+        return self.epoch * self.num_batches + batch
 
     def _get_batch_fmtstr(self, num_batches):
         num_digits = len(str(num_batches // 1))
@@ -516,11 +548,17 @@ class ProgressMeter(object):
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 
-def adjust_learning_rate(optimizer, init_lr, epoch, args):
-    """Decay the learning rate based on schedule"""
-    cur_lr = init_lr * 0.5 * (1. + math.cos(math.pi * epoch / args.epochs))
+
+def adjust_learning_rate(optimizer, epoch, args):
+    """Decays the learning rate with half-cycle cosine after warmup"""
+    if epoch < args.warmup_epochs:
+        lr = args.lr * epoch / args.warmup_epochs
+    else:
+        lr = args.lr * 0.5 * (
+                1. + math.cos(math.pi * (epoch - args.warmup_epochs) / (args.epochs - args.warmup_epochs)))
     for param_group in optimizer.param_groups:
-        param_group['lr'] = cur_lr
+        param_group['lr'] = lr
+    return lr
 
 
 def accuracy(output, target, topk=(1,)):

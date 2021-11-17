@@ -2,22 +2,29 @@ num_classes: 1000
 model: 'mae_ft_vit_large_patch16_224'
 log_wandb: True
 wandb_experiment: 'MAE-FT'
-pretrained: True
-initial_checkpoint: 'output/train/mae_vit-l_wo-norm/last.pth.tar'
+
+pretrained: '/home/caopu/workspace/pytorch-image-model/output/train/20211115-113934-mae_vit_large_patch16_224-224/last.pth.tar'
+
+# Architecture
+arch: 'vit_large'
+
 
 aa: 'rand-m9-mstd0.5'
-color_jitter: 0.0
-hflip: 0.5
-mix_up: 0.8
-cut_mix: 1.0
+img_size: 224
+mixup: 0.8
+cutmix: 1.0
 drop_path: 0.1
 layer_decay: 0.75
+smoothing: 0.1
 
+batch_size: 64 #1024
 weight_decay: 0.05
 opt: 'adamw'
 sched: 'cosine'
 epochs: 50
-lr: 0.004 # base lr = 1e-3   lr = 1024 * base_lr / 256
+lr: 0.001 # base lr = 1e-3   lr = 1024 * base_lr / 256
 warmup_epochs: 5
 warmup_lr: 0.000004
-cooldown_epochs: 0
+
+mean: [0.485, 0.456, 0.406]
+std: [0.229, 0.224, 0.225]

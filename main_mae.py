@@ -80,7 +80,7 @@ parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')
 parser.add_argument('--rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
+parser.add_argument('--dist-url', default='tcp://localhost:10001', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
@@ -197,7 +197,7 @@ def main_worker(gpu, ngpus_per_node, args):
         decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
 
     # infer learning rate before changing batch size
-    args.lr = args.lr * args.batch_size / 256
+    args.lr = args.lr * args.batch_size * args.world_size * ngpus_per_node / 256
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -316,7 +316,7 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
     learning_rates = AverageMeter('LR', ':.4e')
     losses = AverageMeter('Loss', ':.4e')
     progress = ProgressMeter(
-        len(train_loader),
+        len(train_loader), epoch,
         [batch_time, data_time, learning_rates, losses],
         prefix="Epoch: [{}]".format(epoch))
 
@@ -390,15 +390,24 @@ class AverageMeter(object):
 
 
 class ProgressMeter(object):
-    def __init__(self, num_batches, meters, prefix=""):
+    def __init__(self, num_batches, epoch, meters, prefix=""):
         self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
+        self.num_batches = num_batches
+        self.epoch = epoch
         self.meters = meters
         self.prefix = prefix
 
     def display(self, batch):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
+        result = dict()
+        for m in self.meters:
+            result[m.name] = m.val
+        wandb.log(result, step=self.get_iterations(batch))
         print('\t'.join(entries))
+
+    def get_iterations(self, batch):
+        return self.epoch * self.num_batches + batch
 
     def _get_batch_fmtstr(self, num_batches):
         num_digits = len(str(num_batches // 1))
