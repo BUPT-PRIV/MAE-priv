@@ -289,6 +289,7 @@ def main_worker(gpu, ngpus_per_node, args):
             warnings.warn("You've requested to log metrics to wandb but package not found. "
                             "Metrics not being logged to wandb, try `pip install wandb`")
 
+    train_start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -306,6 +307,9 @@ def main_worker(gpu, ngpus_per_node, args):
                 'scaler': scaler.state_dict(),
             }, is_best=False, filename='checkpoint_%04d.pth.tar' % epoch)
 
+            print('>> ETA: {:.2f}min'.format(
+                (time.time()-train_start_time)*(args.epochs-epoch)/(epoch-args.start_epoch+1)/60
+            ))
     if args.rank == 0:
         summary_writer.close()
 

@@ -340,6 +340,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.log_wandb and args.rank == 0:
         wandb.init(project=args.wandb_experiment, config=args)
 
+    train_start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -365,7 +366,9 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best)
             if epoch == args.start_epoch:
                 sanity_check(model.state_dict(), args.pretrained, linear_keyword)
-
+            print('>> ETA: {:.2f}min'.format(
+                (time.time() - train_start_time) * (args.epochs - epoch) / (epoch - args.start_epoch + 1) / 60
+            ))
 
 def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
     batch_time = AverageMeter('Time', ':6.3f')
