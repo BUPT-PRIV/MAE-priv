@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import builtins
 import math
 import os
@@ -340,6 +341,13 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.log_wandb and args.rank == 0:
         wandb.init(project=args.wandb_experiment, config=args)
 
+    if args.rank == 0:
+        ckpt = 'output/' + '-'.join(['finetune',
+                args.arch,
+                datetime.now().strftime("%Y%m%d-%H%M%S"),])
+        if not os.path.exists(ckpt):
+            os.mkdir(ckpt)
+
     train_start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -363,7 +371,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer': optimizer.state_dict(),
-            }, is_best)
+            }, is_best, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
             if epoch == args.start_epoch:
                 sanity_check(model.state_dict(), args.pretrained, linear_keyword)
             print('>> ETA: {:.2f}min'.format(
