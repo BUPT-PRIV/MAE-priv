@@ -169,7 +169,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     if args.arch.startswith('vit'):
-        model = vits.__dict__[args.arch]()
+        model = vits.__dict__[args.arch](drop_path_rate=args.drop_path)
         linear_keyword = 'head'
     else:
         model = torchvision_models.__dict__[args.arch]()
