@@ -108,6 +108,8 @@ parser.add_argument('--gamma', default=0.999, type=float,
                     help='beta2 of optimizer (default: 0.95)')
 parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
+parser.add_argument('--wandb-entity', default='bupt-priv', type=str,
+                    help='user or team name of wandb')
 
 best_acc1 = 0.0
 
@@ -343,7 +345,7 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
     if args.log_wandb and args.rank == 0:
-        wandb.init(project=args.wandb_experiment, config=args)
+        wandb.init(project=args.wandb_experiment, config=args, entity=args.wandb_entity)
 
     if args.rank == 0:
         ckpt = 'output/' + '-'.join(['finetune',

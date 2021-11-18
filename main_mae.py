@@ -116,7 +116,8 @@ parser.add_argument('--warmup-epochs', default=5, type=int, metavar='N',
                     help='number of warmup epochs')
 parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
-
+parser.add_argument('--wandb-entity', default='bupt-priv',
+                    help='user or team name of wandb')
 
 def _parse_args():
     # Do we have a config file to parse?
@@ -287,7 +288,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.log_wandb and args.rank == 0:
         if has_wandb:
-            wandb.init(project=args.wandb_experiment, config=args)
+            wandb.init(project=args.wandb_experiment, config=args, entity=args.wandb_entity)
         else:
             warnings.warn("You've requested to log metrics to wandb but package not found. "
                           "Metrics not being logged to wandb, try `pip install wandb`")
