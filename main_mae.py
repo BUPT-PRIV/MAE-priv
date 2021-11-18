@@ -430,7 +430,7 @@ class ProgressMeter(object):
         result = dict()
         for m in self.meters:
             result['[Epoch] ' + m.name] = m.avg
-        wandb.log(result, step=self.epoch)
+        wandb.log(result, step=self.get_iterations(batch))
         wandb.log({'Epoch': self.epoch}, step=self.get_iterations(batch))
 
     def get_iterations(self, batch):

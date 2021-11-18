@@ -340,9 +340,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # define loss function (criterion) and optimizer
     criterion = SoftTargetCrossEntropy().cuda(args.gpu)
+    validate_loss_fn = nn.CrossEntropyLoss().cuda(args.gpu)
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        validate(val_loader, model, validate_loss_fn, args, 0)
         return
 
     if args.log_wandb and args.rank == 0:
@@ -364,7 +365,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args, epoch)
+        acc1 = validate(val_loader, model, validate_loss_fn, args, epoch)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -567,7 +568,7 @@ class ProgressMeter(object):
         result = dict()
         for m in self.meters:
             result['[Epoch] ' + m.name] = m.avg
-        wandb.log(result, step=self.epoch)
+        wandb.log(result, step=self.get_iterations(batch))
         wandb.log({'Epoch': self.epoch}, step=self.get_iterations(batch))
 
     def get_iterations(self, batch):
