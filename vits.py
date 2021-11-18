@@ -70,22 +70,22 @@ class VisionTransformerDecoder(VisionTransformer):
             self.cls_token = None  # no cls token
         self.head = None  # no cls head
 
-        # weight initialization
-        for name, m in self.named_modules():
-            if isinstance(m, nn.Linear):
-                if 'qkv' in name:
-                    # treat the weights of Q, K, V separately
-                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
-                    nn.init.uniform_(m.weight, -val, val)
-                else:
-                    nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
+        # # weight initialization
+        # for name, m in self.named_modules():
+        #     if isinstance(m, nn.Linear):
+        #         if 'qkv' in name:
+        #             # treat the weights of Q, K, V separately
+        #             val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+        #             nn.init.uniform_(m.weight, -val, val)
+        #         else:
+        #             nn.init.xavier_uniform_(m.weight)
+        #         nn.init.zeros_(m.bias)
 
-        if isinstance(self.patch_embed, PatchEmbed):
-            # xavier_uniform initialization
-            val = math.sqrt(6. / float(3 * reduce(mul, self.patch_embed.patch_size, 1) + self.embed_dim))
-            nn.init.uniform_(self.patch_embed.proj.weight, -val, val)
-            nn.init.zeros_(self.patch_embed.proj.bias)
+        # if isinstance(self.patch_embed, PatchEmbed):
+        #     # xavier_uniform initialization
+        #     val = math.sqrt(6. / float(3 * reduce(mul, self.patch_embed.patch_size, 1) + self.embed_dim))
+        #     nn.init.uniform_(self.patch_embed.proj.weight, -val, val)
+        #     nn.init.zeros_(self.patch_embed.proj.bias)
 
     def build_2d_sincos_position_embedding(self, embed_dim=768, temperature=10000., decode=False):
         h, w = self.patch_embed.grid_size
