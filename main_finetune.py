@@ -148,7 +148,7 @@ def main():
     if args.dist_url == "env://" and args.world_size == -1:
         args.world_size = int(os.environ["WORLD_SIZE"])
 
-    args.lr = args.lr * args.batch_size * args.world_size / 256
+    args.lr = args.lr * args.batch_size / 256
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
 
@@ -229,7 +229,6 @@ def main_worker(gpu, ngpus_per_node, args):
             raise Exception("=> no checkpoint found at '{}'".format(args.pretrained))
 
     # infer learning rate before changing batch size
-    args.lr = args.lr * args.batch_size / 256
     print("=> learning rate: ",  args.lr)
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -241,7 +240,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # When using a single GPU per process and per
             # DistributedDataParallel, we need to divide the batch size
             # ourselves based on the total number of GPUs we have
-            args.batch_size = int(args.batch_size / ngpus_per_node)
+            args.batch_size = int(args.batch_size / args.world_size)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         else:

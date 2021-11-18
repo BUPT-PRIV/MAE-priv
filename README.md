@@ -38,7 +38,7 @@ The following results are based on ImageNet-1k self-supervised pre-training, fol
 </tr>
 </tbody></table>
 
-On 8 NVIDIA GeForce 3090 GPUs, pretrain for 100 epochs needs about xx hours, 4096 batch size needs about xx GB GPU memory.
+On 8 NVIDIA GeForce RTX 3090 GPUs, pretrain for 100 epochs needs about 9 hours, 4096 batch size needs about 24 GB GPU memory.
 
 [1]. fine-tuning for 50 epochs;
 
@@ -66,18 +66,26 @@ On 8 NVIDIA GeForce 3090 GPUs, pretrain for 100 epochs needs about xx hours, 409
 </tr>
 </tbody></table>
 
-On 8 NVIDIA GeForce 3090 GPUs, pretrain for 100 epochs needs about xx hours, 4096 batch size needs about xx GB GPU memory.
+On 8 NVIDIA A40 GPUs, pretrain for 100 epochs needs about 34 hours, 4096 batch size needs about xx GB GPU memory.
 
 
 ### Usage: Preparation
 
-The code has been tested with CUDA 11.0, PyTorch 1.9.0.
+The code has been tested with CUDA 11.4, PyTorch 1.8.2.
+
+#### Notes:
+1. The batch size specified by `-b` is the total batch size across all GPUs from all nodes.
+1. The learning rate specified by `--lr` is the *base* lr (corresponding to 256 batch-size), and is adjusted by the [linear lr scaling rule](https://arxiv.org/abs/1706.02677).
+1. In this repo, only *multi-gpu*, *DistributedDataParallel* training is supported; single-gpu or DataParallel training is not supported. This code is improved to better suit the *multi-node* setting, and by default uses automatic *mixed-precision* for pre-training.
+1. **Only pretraining and finetuning have been tested.**
+
 
 ### Usage: Self-supervised Pre-Training
 
-Below is examples for MAE pre-training. 
+Below is examples for MAE pre-training.
 
-#### Vit-Base with 1-node (8-GPU, NVIDIA GeForce 3090) training, batch 4096
+
+#### ViT-Base with 1-node (8-GPU, NVIDIA GeForce RTX 3090) training, batch 4096
 
 ```
 python main_mae.py \
@@ -86,7 +94,7 @@ python main_mae.py \
   [your imagenet-folder with train and val folders]
 ```
 
-#### Vit-Large with 1-node (8-GPU, NVIDIA GeForce 3090) pre-training, batch 2048
+#### ViT-Large with 1-node (8-GPU, NVIDIA A40) pre-training, batch 2048
 
 ```
 python main_mae.py \
@@ -95,18 +103,13 @@ python main_mae.py \
   [your imagenet-folder with train and val folders]
 ```
 
-#### Notes:
-1. The batch size specified by `-b` is the total batch size across all GPUs.
-1. The learning rate specified by `--lr` is the *base* lr, and is adjusted by the [linear lr scaling rule](https://arxiv.org/abs/1706.02677) in [this line](https://github.com/facebookresearch/moco-v3/blob/main/main_moco.py#L213).
-1. In this repo, only *multi-gpu*, *DistributedDataParallel* training is supported; single-gpu or DataParallel training is not supported. This code is improved to better suit the *multi-node* setting, and by default uses automatic *mixed-precision* for pre-training.
-
 
 ### Usage: End-to-End Fine-tuning ViT
 
 
 Below is examples for MAE fine-tuning.
 
-#### Vit-Base with 1-node (8-GPU, NVIDIA GeForce 3090) training, batch 4096
+#### ViT-Base with 1-node (8-GPU, NVIDIA GeForce RTX 3090) training, batch 1024
 
 ```
 python main_fintune.py \
@@ -115,12 +118,21 @@ python main_fintune.py \
   [your imagenet-folder with train and val folders]
 ```
 
+#### ViT-Large with 2-node (16-GPU, 8 NVIDIA GeForce RTX 3090 + 8 NVIDIA A40) training, batch 512
+
+```
+python main_fintune.py \
+  -c cfgs/ViT-B16_ImageNet1K_finetune.yaml \
+  --multiprocessing-distributed --world-size 2 --rank 0 \
+  [your imagenet-folder with train and val folders]
+```
+On another node, run the same command with --rank 1.
+
 **Note**:
 1. We use `--resume` rather than `--finetune` in the DeiT repo, as its `--finetune` option trains under eval mode. When loading the pre-trained model, revise `model_without_ddp.load_state_dict(checkpoint['model'])` with `strict=False`.
-1. Our ViT-Small is with `heads=12` in the Transformer block, while by default in DeiT it is `heads=6`. Please modify the DeiT code accordingly when fine-tuning our ViT-Small model. 
 
 
-### Usage: Linear Classification
+### [TODO] Usage: Linear Classification
 
 By default, we use momentum-SGD and a batch size of 1024 for linear classification on frozen features/weights. This can be done with a single 8-GPU node.
 
