@@ -52,3 +52,4 @@ sftp-config.json
 
 wandb/
 runs/
+output/
