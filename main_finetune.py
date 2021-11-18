@@ -108,7 +108,7 @@ parser.add_argument('--gamma', default=0.999, type=float,
                     help='beta2 of optimizer (default: 0.95)')
 parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
-parser.add_argument('--wandb-entity', default='bupt-priv', type=str,
+parser.add_argument('--wandb-entity', default=None, type=str,
                     help='user or team name of wandb')
 parser.add_argument('--save_freq', default=10, type=int,
                     help='save frequency (default: 10)')
@@ -357,6 +357,7 @@ def main_worker(gpu, ngpus_per_node, args):
             os.mkdir(ckpt)
 
     train_start_time = time.time()
+    iters_per_epoch = len(train_loader)
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -365,7 +366,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, validate_loss_fn, args, epoch)
+        acc1 = validate(val_loader, model, validate_loss_fn, args, epoch, iters_per_epoch)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -443,7 +444,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
             progress.display(i, args.rank)
     progress.wandb_log(i, args.rank)
 
-def validate(val_loader, model, criterion, args, epoch=None):
+def validate(val_loader, model, criterion, args, epoch=None, iters_per_epoch=None):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -468,11 +469,20 @@ def validate(val_loader, model, criterion, args, epoch=None):
             output = model(images)
             loss = criterion(output, target)
 
-            # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            losses.update(loss.item(), images.size(0))
-            top1.update(acc1[0], images.size(0))
-            top5.update(acc5[0], images.size(0))
+            # measure accuracy and record loss
+            if args.distributed:
+                reduced_loss = reduce_tensor(loss.data, args.world_size)
+                acc1 = reduce_tensor(acc1, args.world_size)
+                acc5 = reduce_tensor(acc5, args.world_size)
+            else:
+                reduced_loss = loss.data
+
+            torch.cuda.synchronize()
+
+            losses.update(reduced_loss.item(), images.size(0))
+            top1.update(acc1.item(), images.size(0))
+            top5.update(acc5.item(), images.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -484,8 +494,8 @@ def validate(val_loader, model, criterion, args, epoch=None):
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
-        if args.rank == 0:
-            wandb.log({'top1': top1.avg, 'top5': top5.avg, '[Epoch] Loss': losses.avg}, step=epoch)
+        if args.rank == 0 and iters_per_epoch:
+            wandb.log({'top1': top1.avg, 'top5': top5.avg, '[Epoch] Loss': losses.avg}, step=((epoch+1) * iters_per_epoch))
 
     return top1.avg
 
@@ -569,7 +579,7 @@ class ProgressMeter(object):
         for m in self.meters:
             result['[Epoch] ' + m.name] = m.avg
         wandb.log(result, step=self.get_iterations(batch))
-        wandb.log({'Epoch': self.epoch}, step=self.get_iterations(batch))
+        wandb.log({'Epoch': self.epoch+1}, step=self.get_iterations(batch))
 
     def get_iterations(self, batch):
         return self.epoch * self.num_batches + batch
@@ -600,6 +610,13 @@ def accuracy(output, target, topk=(1,)):
     pred = pred.t()
     correct = pred.eq(target.reshape(1, -1).expand_as(pred))
     return [correct[:min(k, maxk)].reshape(-1).float().sum(0) * 100. / batch_size for k in topk]
+
+
+def reduce_tensor(tensor, n):
+    rt = tensor.clone()
+    dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+    rt /= n
+    return rt
 
 
 if __name__ == '__main__':

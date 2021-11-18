@@ -116,7 +116,7 @@ parser.add_argument('--warmup-epochs', default=5, type=int, metavar='N',
                     help='number of warmup epochs')
 parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
-parser.add_argument('--wandb-entity', default='bupt-priv',
+parser.add_argument('--wandb-entity', default=None,
                     help='user or team name of wandb')
 parser.add_argument('--save_freq', default=10, type=int,
                     help='save frequency (default: 10)')
@@ -431,7 +431,7 @@ class ProgressMeter(object):
         for m in self.meters:
             result['[Epoch] ' + m.name] = m.avg
         wandb.log(result, step=self.get_iterations(batch))
-        wandb.log({'Epoch': self.epoch}, step=self.get_iterations(batch))
+        wandb.log({'Epoch': self.epoch+1}, step=self.get_iterations(batch))
 
     def get_iterations(self, batch):
         return self.epoch * self.num_batches + batch
