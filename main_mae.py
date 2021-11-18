@@ -118,6 +118,8 @@ parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
 parser.add_argument('--wandb-entity', default='bupt-priv',
                     help='user or team name of wandb')
+parser.add_argument('--save_freq', default=10, type=int,
+                    help='save frequency (default: 10)')
 
 def _parse_args():
     # Do we have a config file to parse?
@@ -311,13 +313,14 @@ def main_worker(gpu, ngpus_per_node, args):
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                                                     and args.rank == 0):  # only the first GPU saves checkpoint
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'scaler': scaler.state_dict(),
-            }, is_best=False, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
+            if epoch % args.save_freq == 0:
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'arch': args.arch,
+                    'state_dict': model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'scaler': scaler.state_dict(),
+                }, is_best=False, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
 
             print('>> ETA: {:.2f}min'.format(
                 (time.time() - train_start_time) * (args.epochs - epoch) / (epoch - args.start_epoch + 1) / 60
@@ -372,7 +375,8 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
 
         if i % args.print_freq == 0 and args.rank == 0:
             progress.display(i)
-
+    if args.rank == 0:
+        progress.wandb_log(i)
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
@@ -421,6 +425,13 @@ class ProgressMeter(object):
             result[m.name] = m.val
         wandb.log(result, step=self.get_iterations(batch))
         print('\t'.join(entries))
+
+    def wandb_log(self, batch):
+        result = dict()
+        for m in self.meters:
+            result['[Epoch] ' + m.name] = m.avg
+        wandb.log(result, step=self.epoch)
+        wandb.log({'Epoch': self.epoch}, step=self.get_iterations(batch))
 
     def get_iterations(self, batch):
         return self.epoch * self.num_batches + batch

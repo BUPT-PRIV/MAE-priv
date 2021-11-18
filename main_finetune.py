@@ -110,7 +110,8 @@ parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
 parser.add_argument('--wandb-entity', default='bupt-priv', type=str,
                     help='user or team name of wandb')
-
+parser.add_argument('--save_freq', default=10, type=int,
+                    help='save frequency (default: 10)')
 best_acc1 = 0.0
 
 
@@ -371,13 +372,14 @@ def main_worker(gpu, ngpus_per_node, args):
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                                                     and args.rank == 0):  # only the first GPU saves checkpoint
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'best_acc1': best_acc1,
-                'optimizer': optimizer.state_dict(),
-            }, is_best, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
+            if epoch % args.save_freq == 0:
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'arch': args.arch,
+                    'state_dict': model.state_dict(),
+                    'best_acc1': best_acc1,
+                    'optimizer': optimizer.state_dict(),
+                }, is_best, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
             if epoch == args.start_epoch:
                 sanity_check(model.state_dict(), args.pretrained, linear_keyword)
             print('>> ETA: {:.2f}min'.format(
@@ -438,7 +440,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
 
         if i % args.print_freq == 0:
             progress.display(i, args.rank)
-
+    progress.wandb_log(i, args.rank)
 
 def validate(val_loader, model, criterion, args, epoch=None):
     batch_time = AverageMeter('Time', ':6.3f')
@@ -482,7 +484,7 @@ def validate(val_loader, model, criterion, args, epoch=None):
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
         if args.rank == 0:
-            wandb.log({'top1': top1.avg, 'top5': top5.avg, 'epoch': epoch})
+            wandb.log({'top1': top1.avg, 'top5': top5.avg, '[Epoch] Loss': losses.avg}, step=epoch)
 
     return top1.avg
 
@@ -560,6 +562,14 @@ class ProgressMeter(object):
             wandb.log(result, step=self.get_iterations(batch))
         print('\t'.join(entries))
 
+    def wandb_log(self, batch, rank):
+        if rank != 0: return True
+        result = dict()
+        for m in self.meters:
+            result['[Epoch] ' + m.name] = m.avg
+        wandb.log(result, step=self.epoch)
+        wandb.log({'Epoch': self.epoch}, step=self.get_iterations(batch))
+
     def get_iterations(self, batch):
         return self.epoch * self.num_batches + batch
 
@@ -583,19 +593,12 @@ def adjust_learning_rate(optimizer, epoch, args):
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
+    maxk = min(max(topk), output.size()[1])
+    batch_size = target.size(0)
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.reshape(1, -1).expand_as(pred))
+    return [correct[:min(k, maxk)].reshape(-1).float().sum(0) * 100. / batch_size for k in topk]
 
 
 if __name__ == '__main__':
