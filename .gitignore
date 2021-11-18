@@ -49,3 +49,6 @@ venv.bak/
 
 # sublime text config
 sftp-config.json
+
+wandb/
+runs/
