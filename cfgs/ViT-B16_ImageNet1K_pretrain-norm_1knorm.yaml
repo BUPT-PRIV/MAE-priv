@@ -5,7 +5,7 @@ wandb_experiment: 'MAE'
 arch: 'vit_base'
 mae_dim: 256
 mae_depth: 1
-mae_norm-p: True
+mae_norm_p: True
 
 # Training Hyparameter
 weight_decay: 0.05
