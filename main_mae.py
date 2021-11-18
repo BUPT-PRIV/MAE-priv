@@ -198,7 +198,8 @@ def main_worker(gpu, ngpus_per_node, args):
     print("=> creating model '{}'".format(args.arch))
     model = mae.builder.MAE(
         partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t),
-        decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
+        decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p,
+        mean=args.mean, std=args.std)
 
     # infer learning rate before changing batch size
     args.lr = args.lr * args.batch_size / 256
