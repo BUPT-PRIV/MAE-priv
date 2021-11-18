@@ -353,6 +353,8 @@ def main_worker(gpu, ngpus_per_node, args):
         ckpt = 'output/' + '-'.join(['finetune',
                                      args.arch,
                                      datetime.now().strftime("%Y%m%d-%H%M%S"), ])
+        if not os.path.exists('output'):
+            os.mkdir('output')
         if not os.path.exists(ckpt):
             os.mkdir(ckpt)
 
