@@ -29,7 +29,8 @@ class MAE(nn.Module):
         # Bx(14*14*0.75)x512 = Bx147x512
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
         self.dim_proj = nn.Linear(self.encoder.embed_dim, decoder_dim)
-        self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(embed_dim=decoder_dim)
+        # self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(embed_dim=decoder_dim)
+        self.decoder_pos_embed = self.encoder.get_sinusoid_encoding_table(self.num_patches, decoder_dim)
 
         # build decoder
         self.decoder = self._build_decoder(

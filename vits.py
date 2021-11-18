@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from functools import partial, reduce
 from operator import mul
+import numpy as np
 
 from mae.vision_transformer import VisionTransformer
 from mae.layers import to_2tuple
@@ -56,7 +57,8 @@ class VisionTransformerDecoder(VisionTransformer):
     def __init__(self, mask_ratio=0.75, **kwargs):
         super().__init__(**kwargs)
         # Use fixed 2D sin-cos position embedding
-        self.pos_embed = self.build_2d_sincos_position_embedding(embed_dim=self.embed_dim)
+        # self.pos_embed = self.build_2d_sincos_position_embedding(embed_dim=self.embed_dim)
+        self.pos_embed = self.get_sinusoid_encoding_table(self.patch_embed.num_patches, self.embed_dim)
 
         self.patch_size = self.patch_embed.patch_size  # 16
         self.num_patches = self.patch_embed.num_patches  # 14*14=196
@@ -83,6 +85,19 @@ class VisionTransformerDecoder(VisionTransformer):
             val = math.sqrt(6. / float(3 * reduce(mul, self.patch_embed.patch_size, 1) + self.embed_dim))
             nn.init.uniform_(self.patch_embed.proj.weight, -val, val)
             nn.init.zeros_(self.patch_embed.proj.bias)
+
+    @staticmethod
+    def get_sinusoid_encoding_table(n_position, d_hid):
+        ''' Sinusoid position encoding table '''
+        # TODO: make it with torch instead of numpy
+        def get_position_angle_vec(position):
+            return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
+
+        sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
+        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2]) # dim 2i
+        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2]) # dim 2i+1
+
+        return torch.FloatTensor(sinusoid_table).unsqueeze(0)
 
     def build_2d_sincos_position_embedding(self, embed_dim=768, temperature=10000.):
         h, w = self.patch_embed.grid_size
