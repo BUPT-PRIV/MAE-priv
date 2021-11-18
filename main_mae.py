@@ -13,6 +13,7 @@ import logging
 
 try:
     import wandb
+
     has_wandb = True
 except ImportError:
     has_wandb = False
@@ -177,6 +178,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.multiprocessing_distributed and (args.gpu != 0 or args.rank != 0):
         def print_pass(*args):
             pass
+
         builtins.print = print_pass
 
     print("Use GPU: {} for training".format(args.gpu))
@@ -231,8 +233,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.optimizer == 'lars':
         optimizer = utils.LARS(model.parameters(), args.lr,
-                                       weight_decay=args.weight_decay,
-                                       momentum=args.momentum)
+                               weight_decay=args.weight_decay,
+                               momentum=args.momentum)
     elif args.optimizer == 'adamw':
         optimizer = torch.optim.AdamW(model.parameters(), args.lr,
                                       betas=(0.9, args.gamma),
@@ -288,12 +290,12 @@ def main_worker(gpu, ngpus_per_node, args):
             wandb.init(project=args.wandb_experiment, config=args)
         else:
             warnings.warn("You've requested to log metrics to wandb but package not found. "
-                            "Metrics not being logged to wandb, try `pip install wandb`")
+                          "Metrics not being logged to wandb, try `pip install wandb`")
 
     if args.rank == 0:
         ckpt = 'output/' + '-'.join(['pretrain',
-                args.arch,
-                datetime.now().strftime("%Y%m%d-%H%M%S"),])
+                                     args.arch,
+                                     datetime.now().strftime("%Y%m%d-%H%M%S"), ])
         if not os.path.exists(ckpt):
             os.mkdir(ckpt)
 
@@ -316,7 +318,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best=False, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
 
             print('>> ETA: {:.2f}min'.format(
-                (time.time()-train_start_time)*(args.epochs-epoch)/(epoch-args.start_epoch+1)/60
+                (time.time() - train_start_time) * (args.epochs - epoch) / (epoch - args.start_epoch + 1) / 60
             ))
     if args.rank == 0:
         summary_writer.close()

@@ -15,6 +15,7 @@ __all__ = [
     'vit_conv_base',
 ]
 
+
 def _cfg(url='', **kwargs):
     return {
         'url': url,

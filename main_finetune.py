@@ -111,6 +111,7 @@ parser.add_argument('--log-wandb', action='store_true', default=False,
 
 best_acc1 = 0.0
 
+
 def _parse_args():
     # Do we have a config file to parse?
     args_config, remaining = config_parser.parse_known_args()
@@ -126,6 +127,7 @@ def _parse_args():
     # Cache the args as a text string to save them in the output dir later
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
     return args, args_text
+
 
 def main():
     setup_default_logging()
@@ -173,6 +175,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.multiprocessing_distributed and args.gpu != 0:
         def print_pass(*args):
             pass
+
         builtins.print = print_pass
 
     if args.distributed:
@@ -229,7 +232,7 @@ def main_worker(gpu, ngpus_per_node, args):
             raise Exception("=> no checkpoint found at '{}'".format(args.pretrained))
 
     # infer learning rate before changing batch size
-    print("=> learning rate: ",  args.lr)
+    print("=> learning rate: ", args.lr)
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
         # should always set the single device scope, otherwise,
@@ -344,8 +347,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.rank == 0:
         ckpt = 'output/' + '-'.join(['finetune',
-                args.arch,
-                datetime.now().strftime("%Y%m%d-%H%M%S"),])
+                                     args.arch,
+                                     datetime.now().strftime("%Y%m%d-%H%M%S"), ])
         if not os.path.exists(ckpt):
             os.mkdir(ckpt)
 
@@ -378,6 +381,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print('>> ETA: {:.2f}min'.format(
                 (time.time() - train_start_time) * (args.epochs - epoch) / (epoch - args.start_epoch + 1) / 60
             ))
+
 
 def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
     batch_time = AverageMeter('Time', ':6.3f')
@@ -476,7 +480,7 @@ def validate(val_loader, model, criterion, args, epoch=None):
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
         if args.rank == 0:
-            wandb.log({'top1': top1.avg, 'top5': top5.avg, 'epoch':epoch})
+            wandb.log({'top1': top1.avg, 'top5': top5.avg, 'epoch': epoch})
 
     return top1.avg
 
@@ -561,7 +565,6 @@ class ProgressMeter(object):
         num_digits = len(str(num_batches // 1))
         fmt = '{:' + str(num_digits) + 'd}'
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
-
 
 
 def adjust_learning_rate(optimizer, epoch, args):

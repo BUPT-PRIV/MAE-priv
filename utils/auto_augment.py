@@ -24,7 +24,6 @@ from PIL import Image, ImageOps, ImageEnhance, ImageChops
 import PIL
 import numpy as np
 
-
 _PIL_VER = tuple([int(x) for x in PIL.__version__.split('.')[:2]])
 
 _FILL = (128, 128, 128)
@@ -282,7 +281,6 @@ LEVEL_TO_ARG = {
     'TranslateXRel': _translate_rel_level_to_arg,
     'TranslateYRel': _translate_rel_level_to_arg,
 }
-
 
 NAME_TO_OP = {
     'AutoContrast': auto_contrast,
@@ -558,9 +556,8 @@ _RAND_TRANSFORMS = [
     'ShearY',
     'TranslateXRel',
     'TranslateYRel',
-    #'Cutout'  # NOTE I've implement this as random erasing separately
+    # 'Cutout'  # NOTE I've implement this as random erasing separately
 ]
-
 
 _RAND_INCREASING_TRANSFORMS = [
     'AutoContrast',
@@ -578,10 +575,8 @@ _RAND_INCREASING_TRANSFORMS = [
     'ShearY',
     'TranslateXRel',
     'TranslateYRel',
-    #'Cutout'  # NOTE I've implement this as random erasing separately
+    # 'Cutout'  # NOTE I've implement this as random erasing separately
 ]
-
-
 
 # These experimental weights are based loosely on the relative improvements mentioned in paper.
 # They may not result in increased performance, but could likely be tuned to so.
@@ -723,6 +718,7 @@ class AugMixAugment:
     From paper: 'AugMix: A Simple Data Processing Method to Improve Robustness and Uncertainty -
     https://arxiv.org/abs/1912.02781
     """
+
     def __init__(self, ops, alpha=1., width=3, depth=-1, blended=False):
         self.ops = ops
         self.alpha = alpha

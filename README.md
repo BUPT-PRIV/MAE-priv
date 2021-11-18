@@ -5,6 +5,13 @@ This is an unofficial PyTorch implementation of [Masked Autoencoders Are Scalabl
 
 This repo is mainly based on [moco-v3](https://github.com/facebookresearch/moco-v3), [pytorch-image-models](https://github.com/rwightman/pytorch-image-models) and [BEiT](https://github.com/microsoft/unilm/tree/master/beit)
 
+### TODO
+- [ ] visualization of reconstruction image
+- [ ] linear prob
+- [ ] more results
+- [ ] transfer learning
+- [ ] ...
+
 ### Main Results
 
 The following results are based on ImageNet-1k self-supervised pre-training, followed by ImageNet-1k supervised training for linear evaluation or end-to-end fine-tuning. 
@@ -92,6 +99,12 @@ python main_mae.py \
   -c cfgs/ViT-B16_ImageNet1K_pretrain.yaml \
   --multiprocessing-distributed --world-size 1 --rank 0 \
   [your imagenet-folder with train and val folders]
+```
+
+or
+
+```
+sh train_mae.sh
 ```
 
 #### ViT-Large with 1-node (8-GPU, NVIDIA A40) pre-training, batch 2048
