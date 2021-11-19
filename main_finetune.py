@@ -24,7 +24,7 @@ import wandb
 import yaml
 import mae.mae_ft_vision_transformer as vits
 from utils import rand_augment_transform, Mixup, ModelEma, LayerDecayValueAssigner, SoftTargetCrossEntropy, \
-    create_optimizer, setup_default_logging
+    create_optimizer, setup_default_logging, CheckpointSaver
 
 _logger = logging.getLogger('train')
 
@@ -349,6 +349,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.log_wandb and args.rank == 0:
         wandb.init(project=args.wandb_experiment, config=args, entity=args.wandb_entity)
 
+    saver = None
     if args.rank == 0:
         ckpt = 'output/' + '-'.join(['finetune',
                                      args.arch,
@@ -357,6 +358,9 @@ def main_worker(gpu, ngpus_per_node, args):
             os.mkdir('output')
         if not os.path.exists(ckpt):
             os.mkdir(ckpt)
+        saver = CheckpointSaver(
+            model=model, optimizer=optimizer, args=args,
+            checkpoint_dir=ckpt, recovery_dir=ckpt, decreasing=False, max_history=10)
 
     train_start_time = time.time()
     iters_per_epoch = len(train_loader)
@@ -371,25 +375,18 @@ def main_worker(gpu, ngpus_per_node, args):
         acc1 = validate(val_loader, model, validate_loss_fn, args, epoch, iters_per_epoch)
 
         # remember best acc@1 and save checkpoint
-        is_best = acc1 > best_acc1
-        best_acc1 = max(acc1, best_acc1)
+        # is_best = acc1 > best_acc1
+        # best_acc1 = max(acc1, best_acc1)
+
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                                                     and args.rank == 0):  # only the first GPU saves checkpoint
-            if epoch % args.save_freq == 0:
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'arch': args.arch,
-                    'state_dict': model.state_dict(),
-                    'best_acc1': best_acc1,
-                    'optimizer': optimizer.state_dict(),
-                }, is_best, filename=os.path.join(ckpt, 'checkpoint_%04d.pth.tar' % epoch))
-            if epoch == args.start_epoch:
-                sanity_check(model.state_dict(), args.pretrained, linear_keyword)
+            if saver is not None:
+                best_acc1, best_epoch = saver.save_checkpoint(epoch+1, metric=acc1)
             print('>> ETA: {:.2f}min'.format(
                 (time.time() - train_start_time) * (args.epochs - epoch) / (epoch - args.start_epoch + 1) / 60
             ))
-
+    print('>> Best metric:{} (epoch{}).format(best_metric, best_epoch')
 
 def train(train_loader, model, criterion, optimizer, epoch, args, mixup_fn):
     batch_time = AverageMeter('Time', ':6.3f')
