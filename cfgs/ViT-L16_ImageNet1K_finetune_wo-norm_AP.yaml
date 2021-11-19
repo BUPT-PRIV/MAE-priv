@@ -1,0 +1,30 @@
+num_classes: 1000
+model: 'mae_ft_vit_large_patch16_224'
+log_wandb: True
+wandb_experiment: 'MAE-FT'
+
+pretrained: 'weight/vit_large_pretrain.pth.tar'
+
+# Architecture
+arch: 'vit_large'
+
+
+aa: 'rand-m9-mstd0.5'
+img_size: 224
+mixup: 0.8
+cutmix: 1.0
+drop_path: 0.1
+layer_decay: 0.75
+smoothing: 0.1
+
+batch_size: 512 #1024
+weight_decay: 0.05
+opt: 'adamw'
+sched: 'cosine'
+epochs: 50
+lr: 0.001 # base lr = 1e-3   lr = 1024 * base_lr / 256
+warmup_epochs: 5
+use_mean_pooling: True
+
+mean: (0.0, 0.0, 0.0)
+std: (1.0, 1.0, 1.0)
