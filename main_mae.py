@@ -167,6 +167,7 @@ def main():
 
 
 def main_worker(gpu, ngpus_per_node, args):
+    global wandb
     args.gpu = gpu
 
     # suppress printing if not first GPU on each node
@@ -283,7 +284,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
     wandb = None
     if args.log_wandb and args.rank == 0:
-        global wandb
         import wandb
         wandb.init(project=args.wandb_experiment, config=args, entity=args.wandb_entity)
 
