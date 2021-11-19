@@ -13,14 +13,11 @@ class MAE(nn.Module):
     https://arxiv.org/abs/2111.06377
     """
 
-    def __init__(self, encoder, image_size=224, decoder_dim=512, decoder_depth=8, normalized_pixel=False, mean=[0, 0, 0], std=[1, 1, 1]):
+    def __init__(self, encoder, image_size=224, decoder_dim=512, decoder_depth=8, normalized_pixel=False):
         super(MAE, self).__init__()
 
         self.image_size = image_size
         self.normalized_pixel = normalized_pixel  # TODO
-
-        self.register_buffer('mean', torch.tensor(mean, dtype=torch.float32)[None, :, None, None])
-        self.register_buffer('std', torch.tensor(std, dtype=torch.float32)[None, :, None, None])
 
         # build encoder
         self.encoder = encoder()
@@ -85,8 +82,7 @@ class MAE(nn.Module):
         decoder_output = self.decoder_linear_proj(decoder_output)  # Bx(14*14)x512 --> Bx(14*14)x(16*16*3)
 
         # target
-        target = x * self.std + self.mean
-        target = target.view(
+        target = x.view(
             [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[1]]
         )  # Bx3x224x224 --> Bx3x16x14x16x14
         # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
