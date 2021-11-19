@@ -53,18 +53,20 @@ class PatchEmbed(nn.Module):
 
 
 class VisionTransformerDecoder(VisionTransformer):
-    def __init__(self, mask_ratio=0.75, **kwargs):
+    def __init__(self, mask_ratio=0.75, use_mean_pooling=False, **kwargs):
         super().__init__(**kwargs)
         # Use fixed 2D sin-cos position embedding
         self.pos_embed = self.build_2d_sincos_position_embedding(embed_dim=self.embed_dim)
 
+        self.use_mean_pooling = use_mean_pooling
         self.patch_size = self.patch_embed.patch_size  # 16
         self.num_patches = self.patch_embed.num_patches  # 14*14=196
         self.mask_ratio = mask_ratio
         self.masked_size = int(self.mask_ratio * self.num_patches)  # 147
         self.visible_size = self.num_patches - self.masked_size  # 49
 
-        self.cls_token = None  # no cls token
+        if use_mean_pooling:
+            self.cls_token = None  # no cls token
         self.head = None  # no cls head
 
         # weight initialization
@@ -97,22 +99,36 @@ class VisionTransformerDecoder(VisionTransformer):
         out_h = torch.einsum('m,d->md', [grid_h.flatten(), omega])
         pos_emb = torch.cat([torch.sin(out_w), torch.cos(out_w), torch.sin(out_h), torch.cos(out_h)], dim=1)[None, :, :]
 
-        # no cls token
-        # assert self.num_tokens == 1, 'Assuming one and only one token, [cls]'
-        # pe_token = torch.zeros([1, 1, embed_dim], dtype=torch.float32)
-        # return nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
-        pos_embed = nn.Parameter(pos_emb)
+        if self.use_mean_pooling:
+            pos_embed = nn.Parameter(pos_emb)
+        else:
+            assert self.num_tokens == 1, 'Assuming one and only one token, [cls]'
+            pe_token = torch.zeros([1, 1, embed_dim], dtype=torch.float32)
+            pos_embed = nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
         pos_embed.requires_grad = False
         return pos_embed
 
     def forward(self, x):
         x = self.patch_embed(x)  # BNC = B(HW)C = Bx(14*14)x768
+
+        if not self.use_mean_pooling:
+            cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+            x = torch.cat((cls_token, x), dim=1)
+
         x = self.pos_drop(x + self.pos_embed)
 
         shuffle = torch.randperm(self.num_patches)
+        if not self.use_mean_pooling:
+            shuffle = torch.cat([torch.zeros(1, dtype=torch.long), shuffle + 1])  # [0, ...]
+
         shuffle_token = x[:, shuffle, :]
-        visible_token = shuffle_token[:, :self.visible_size, :]  # Bx(14*14*0.25)x768 = Bx49x768
-        # masked_token = shuffle_token[:, self.visible_size:, :]  # Bx(14*14*0.75)x768 = Bx147x768
+
+        if not self.use_mean_pooling:
+            visible_token = shuffle_token[:, :self.visible_size + 1, :]  # Bx(14*14*0.25+1)x768 = Bx50x768
+            # masked_token = shuffle_token[:, self.visible_size + 1:, :]  # Bx(14*14*0.75-1)x768 = Bx146x768
+        else:
+            visible_token = shuffle_token[:, :self.visible_size, :]  # Bx(14*14*0.25)x768 = Bx49x768
+            # masked_token = shuffle_token[:, self.visible_size:, :]  # Bx(14*14*0.75)x768 = Bx147x768
 
         encoded_visible_patches = self.blocks(visible_token)
         encoded_visible_patches = self.norm(encoded_visible_patches)

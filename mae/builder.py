@@ -24,6 +24,7 @@ class MAE(nn.Module):
         self.num_patches = self.encoder.num_patches
         self.patch_size = self.encoder.patch_size
         self.visible_size = self.encoder.visible_size
+        self.use_mean_pooling = self.encoder.use_mean_pooling
 
         # build dim_proj
         # Bx(14*14*0.75)x512 = Bx147x512
@@ -75,6 +76,9 @@ class MAE(nn.Module):
             [encoded_visible_patches, self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])], dim=1
         )[:, shuffle.sort()[1], :]  # Bx49x512 + Bx147x512 --> Bx196x512
         decoder_input = decoder_input + self.decoder_pos_embed
+
+        if not self.use_mean_pooling:
+            decoder_input = decoder_input[:, 1:]  # no cls token
 
         # decode (encoded_visible_patches + mask_token)
         decoder_output = self.decoder(decoder_input)  # Bx(14*14)x512

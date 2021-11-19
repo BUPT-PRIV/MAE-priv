@@ -119,7 +119,7 @@ class VisionTransformer(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=True, representation_size=None, distilled=False,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0., embed_layer=PatchEmbed, norm_layer=None,
-                 act_layer=None, weight_init=''):
+                 act_layer=None, weight_init='', use_mean_pooling=False):
         """
         Args:
             img_size (int, tuple): input image size
@@ -144,6 +144,7 @@ class VisionTransformer(nn.Module):
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.num_tokens = 2 if distilled else 1
+        self.use_mean_pooling = use_mean_pooling
         norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
         act_layer = act_layer or nn.GELU
 
@@ -151,7 +152,7 @@ class VisionTransformer(nn.Module):
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
         num_patches = self.patch_embed.num_patches
 
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+        self.cls_token = None if use_mean_pooling else nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = self.build_2d_sincos_position_embedding(
             img_size // patch_size, img_size // patch_size, embed_dim
         )
@@ -181,8 +182,12 @@ class VisionTransformer(nn.Module):
         out_h = torch.einsum('m,d->md', [grid_h.flatten(), omega])
         pos_emb = torch.cat([torch.sin(out_w), torch.cos(out_w), torch.sin(out_h), torch.cos(out_h)], dim=1)[None, :, :]
 
-        pe_token = torch.zeros([1, 1, self.embed_dim], dtype=torch.float32)
-        pos_embed = nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
+        if self.use_mean_pooling:
+            pos_embed = nn.Parameter(pos_emb)
+        else:
+            assert self.num_tokens == 1, 'Assuming one and only one token, [cls]'
+            pe_token = torch.zeros([1, 1, dim], dtype=torch.float32)
+            pos_embed = nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
         pos_embed.requires_grad = False
         return pos_embed
 
@@ -193,7 +198,8 @@ class VisionTransformer(nn.Module):
         assert mode in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in mode else 0.
 
-        trunc_normal_(self.cls_token, std=.02)
+        if not self.use_mean_pooling:
+            trunc_normal_(self.cls_token, std=.02)
         self.apply(_init_vit_weights)
 
     def _init_weights(self, m):
@@ -222,10 +228,13 @@ class VisionTransformer(nn.Module):
 
     def forward_features(self, x):
         x = self.patch_embed(x)
-        cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
-        x = torch.cat((cls_token, x), dim=1)
+        if not self.use_mean_pooling:
+            cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+            x = torch.cat((cls_token, x), dim=1)
         x = self.pos_drop(x + self.pos_embed)
         x = self.blocks(x)
+        if self.use_mean_pooling:
+            x = x.mean(1, keepdim=True)
         x = self.norm(x)
         return x[:, 0]
 

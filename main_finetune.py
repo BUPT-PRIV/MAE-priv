@@ -111,6 +111,8 @@ parser.add_argument('--wandb-entity', default=None, type=str,
                     help='user or team name of wandb')
 parser.add_argument('--save_freq', default=10, type=int,
                     help='save frequency (default: 10)')
+parser.add_argument('--use-mean-pooling', default=False, type=bool,
+                    help='use mean pooling (default: False)')
 best_acc1 = 0.0
 
 
@@ -199,7 +201,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     if args.arch.startswith('vit'):
-        model = vits.__dict__[args.arch](drop_path_rate=args.drop_path)
+        model = vits.__dict__[args.arch](drop_path_rate=args.drop_path, use_mean_pooling=args.use_mean_pooling)
         linear_keyword = 'head'
     else:
         model = torchvision_models.__dict__[args.arch]()
