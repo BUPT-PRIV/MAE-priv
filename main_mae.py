@@ -10,14 +10,6 @@ import warnings
 from functools import partial
 import yaml
 import logging
-
-try:
-    import wandb
-
-    has_wandb = True
-except ImportError:
-    has_wandb = False
-
 import torch
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
@@ -289,12 +281,11 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
 
+    wandb = None
     if args.log_wandb and args.rank == 0:
-        if has_wandb:
-            wandb.init(project=args.wandb_experiment, config=args, entity=args.wandb_entity)
-        else:
-            warnings.warn("You've requested to log metrics to wandb but package not found. "
-                          "Metrics not being logged to wandb, try `pip install wandb`")
+        global wandb
+        import wandb
+        wandb.init(project=args.wandb_experiment, config=args, entity=args.wandb_entity)
 
     if args.rank == 0:
         ckpt = 'output/' + '-'.join(['pretrain',
@@ -377,7 +368,7 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
 
         if i % args.print_freq == 0 and args.rank == 0:
             progress.display(i)
-    if args.rank == 0:
+    if args.rank == 0 and args.log_wandb:
         progress.wandb_log(i)
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
@@ -425,15 +416,16 @@ class ProgressMeter(object):
         result = dict()
         for m in self.meters:
             result[m.name] = m.val
-        wandb.log(result, step=self.get_iterations(batch))
+        if wandb:
+            wandb.log(result, step=self.get_iterations(batch))
         print('\t'.join(entries))
 
     def wandb_log(self, batch):
-        result = dict()
+        if not wandb: return True
+        result = {'Epoch': self.epoch+1}
         for m in self.meters:
             result['[Epoch] ' + m.name] = m.avg
         wandb.log(result, step=self.get_iterations(batch))
-        wandb.log({'Epoch': self.epoch+1}, step=self.get_iterations(batch))
 
     def get_iterations(self, batch):
         return self.epoch * self.num_batches + batch

@@ -20,7 +20,6 @@ import torch.utils.data.distributed
 import torchvision.datasets as datasets
 import torchvision.models as torchvision_models
 import torchvision.transforms as transforms
-import wandb
 import yaml
 import mae.mae_ft_vision_transformer as vits
 from utils import rand_augment_transform, Mixup, ModelEma, LayerDecayValueAssigner, SoftTargetCrossEntropy, \
@@ -346,7 +345,10 @@ def main_worker(gpu, ngpus_per_node, args):
         validate(val_loader, model, validate_loss_fn, args, 0)
         return
 
+    wandb = None
     if args.log_wandb and args.rank == 0:
+        global wandb
+        import wandb
         wandb.init(project=args.wandb_experiment, config=args, entity=args.wandb_entity)
 
     saver = None
@@ -488,45 +490,14 @@ def validate(val_loader, model, criterion, args, epoch=None, iters_per_epoch=Non
             end = time.time()
 
             if i % args.print_freq == 0:
-                progress.display(i, args.rank)
+                progress.display(i, -1)
 
         # TODO: this should also be done with the ProgressMeter
-        print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
-              .format(top1=top1, top5=top5))
+        print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'.format(top1=top1, top5=top5))
         if args.rank == 0 and iters_per_epoch:
             wandb.log({'top1': top1.avg, 'top5': top5.avg, '[Epoch] Loss': losses.avg}, step=((epoch+1) * iters_per_epoch))
 
     return top1.avg
-
-
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
-
-
-def sanity_check(state_dict, pretrained_weights, linear_keyword):
-    """
-    Linear classifier should not change any weights other than the linear layer.
-    This sanity check asserts nothing wrong happens (e.g., BN stats updated).
-    """
-    print("=> loading '{}' for sanity check".format(pretrained_weights))
-    checkpoint = torch.load(pretrained_weights, map_location="cpu")
-    state_dict_pre = checkpoint['state_dict']
-
-    for k in list(state_dict.keys()):
-        # only ignore linear layer
-        if '%s.weight' % linear_keyword in k or '%s.bias' % linear_keyword in k:
-            continue
-
-        # name in pretrained model
-        k_pre = 'module.base_encoder.' + k[len('module.'):] \
-            if k.startswith('module.') else 'module.base_encoder.' + k
-
-        assert ((state_dict[k].cpu() == state_dict_pre[k_pre]).all()), \
-            '{} is changed in linear classifier training.'.format(k)
-
-    print("=> sanity check passed.")
 
 
 class AverageMeter(object):
@@ -568,12 +539,12 @@ class ProgressMeter(object):
         result = dict()
         for m in self.meters:
             result[m.name] = m.val
-        if rank == 0:
+        if rank == 0 and wandb is not None:
             wandb.log(result, step=self.get_iterations(batch))
         print('\t'.join(entries))
 
     def wandb_log(self, batch, rank):
-        if rank != 0: return True
+        if not wandb or rank != 0: return True
         result = dict()
         for m in self.meters:
             result['[Epoch] ' + m.name] = m.avg
