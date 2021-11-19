@@ -498,7 +498,7 @@ def validate(val_loader, model, criterion, args, epoch=None, iters_per_epoch=Non
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'.format(top1=top1, top5=top5))
         if args.rank == 0 and iters_per_epoch:
-            wandb.log({'top1': top1.avg, 'top5': top5.avg, '[Epoch] Loss': losses.avg}, step=((epoch+1) * iters_per_epoch))
+            wandb.log({'top1': top1.avg, 'top5': top5.avg, '[Epoch] Eval-Loss': losses.avg}, step=((epoch+1) * iters_per_epoch))
 
     return top1.avg
 
@@ -548,11 +548,10 @@ class ProgressMeter(object):
 
     def wandb_log(self, batch, rank):
         if not wandb or rank != 0: return True
-        result = dict()
+        result = {'Epoch': self.epoch+1}
         for m in self.meters:
-            result['[Epoch] ' + m.name] = m.avg
+            result['[Epoch] Train-' + m.name] = m.avg
         wandb.log(result, step=self.get_iterations(batch))
-        wandb.log({'Epoch': self.epoch+1}, step=self.get_iterations(batch))
 
     def get_iterations(self, batch):
         return self.epoch * self.num_batches + batch
