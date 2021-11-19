@@ -30,7 +30,7 @@ class MAE(nn.Module):
         # Bx(14*14*0.75)x512 = Bx147x512
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
         self.dim_proj = nn.Linear(self.encoder.embed_dim, decoder_dim)
-        self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(embed_dim=decoder_dim)
+        self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(embed_dim=decoder_dim, decode=True)
 
         # build decoder
         self.decoder = self._build_decoder(
@@ -76,9 +76,6 @@ class MAE(nn.Module):
             [encoded_visible_patches, self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])], dim=1
         )[:, shuffle.sort()[1], :]  # Bx49x512 + Bx147x512 --> Bx196x512
         decoder_input = decoder_input + self.decoder_pos_embed
-
-        if not self.use_mean_pooling:
-            decoder_input = decoder_input[:, 1:]  # no cls token
 
         # decode (encoded_visible_patches + mask_token)
         decoder_output = self.decoder(decoder_input)  # Bx(14*14)x512
