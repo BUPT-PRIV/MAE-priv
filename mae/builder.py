@@ -38,7 +38,9 @@ class MAE(nn.Module):
             decoder_dim=decoder_dim, decoder_head=decoder_dim // 64, decoder_depth=decoder_depth
         )
         self.decoder_norm = nn.LayerNorm(decoder_dim, eps=1e-6)
-        self.decoder_linear_proj = nn.Linear(decoder_dim, self.patch_size[0] * self.patch_size[1] * 3)
+
+        self.color_channel = 6 if mix_mode is not None else 3
+        self.decoder_linear_proj = nn.Linear(decoder_dim, self.patch_size[0] * self.patch_size[1] * self.color_channel)
 
         # mix mae
         self.mix_up = None
@@ -78,7 +80,7 @@ class MAE(nn.Module):
             target = x
 
         # encode visible token
-        B, C, H, W = x.size()  # B, 3, 224, 224
+        B, C, H, W = target.size()  # B, 3, 224, 224
         encoded_visible_patches, shuffle = self.encoder(x)
 
         # un-shuffle  with positional embedding
@@ -92,17 +94,18 @@ class MAE(nn.Module):
         decoder_output = self.decoder(decoder_input)  # Bx(14*14)x512
         decoder_output = self.decoder_norm(decoder_output)
         decoder_output = self.decoder_linear_proj(decoder_output)  # Bx(14*14)x512 --> Bx(14*14)x(16*16*3)
-
+        decoder_output = decoder_output[:, shuffle[self.visible_size:], :]
         # target
         target = target.view(
             [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[1]]
         )  # Bx3x224x224 --> Bx3x16x14x16x14
         # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
         target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1, C)
+        target = target[:, shuffle[self.visible_size:], :, :]
         if self.normalized_pixel:
             mean = target.mean(dim=-2, keepdim=True)
             std = target.var(dim=-2, unbiased=True, keepdim=True).sqrt()
             target = (target - mean) / (std + 1e-6)
         target = target.view(B, self.num_patches, -1)
 
-        return self._mse_loss(decoder_output, target, masked_index=shuffle[self.visible_size:])
+        return self._mse_loss(decoder_output, target)
