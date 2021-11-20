@@ -99,6 +99,8 @@ parser.add_argument('--mae-norm-p', default=False, type=bool,
                     help='normalized pixel (default: False)')
 parser.add_argument('--use-mean-pooling', default=False, type=bool,
                     help='use mean pooling (default: False)')
+parser.add_argument('--pyramid-reconstruction', default=False, type=bool,
+                    help='pyramid reconstruction image (default: False)')
 
 # other upgrades
 parser.add_argument('--optimizer', default='lars', type=str,
@@ -194,7 +196,8 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     model = mae.builder.PriT(
-        partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t, use_mean_pooling=args.use_mean_pooling),
+        partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t,
+            use_mean_pooling=args.use_mean_pooling, pyramid_reconstruction=args.pyramid_reconstruction),
         decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
 
     # infer learning rate before changing batch size
