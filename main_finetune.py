@@ -360,9 +360,9 @@ def main_worker(gpu, ngpus_per_node, args):
                                      args.arch,
                                      datetime.now().strftime("%Y%m%d-%H%M%S"), ])
         if not os.path.exists('output'):
-            os.mkdir('output')
+            os.makedirs('output')
         if not os.path.exists(ckpt):
-            os.mkdir(ckpt)
+            os.makedirs(ckpt)
         saver = CheckpointSaver(
             model=model, optimizer=optimizer, args=args,
             checkpoint_dir=ckpt, recovery_dir=ckpt, decreasing=False, max_history=10)
