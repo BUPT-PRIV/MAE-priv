@@ -95,7 +95,7 @@ class PriTEncoder(VisionTransformer):
         self.num_layers = len(depths)
         self.mask_ratio = mask_ratio
         self.use_mean_pooling = use_mean_pooling
-        use_cls_token = not use_mean_pooling
+        self.use_cls_token = use_cls_token = not use_mean_pooling
 
         self.stride = stride = patch_size * reduce(mul, strides)  # 32 = 4 * 2 * 2 * 2 * 1
         self.out_size = out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 = 224 / 32
@@ -169,7 +169,7 @@ class PriTEncoder(VisionTransformer):
         out_h = torch.einsum('m,d->md', [grid_h.flatten(), omega])
         pos_emb = torch.cat([torch.sin(out_w), torch.cos(out_w), torch.sin(out_h), torch.cos(out_h)], dim=1)[None, :, :]
 
-        if self.use_mean_pooling or decode:
+        if not self.use_cls_token or decode:
             pos_embed = nn.Parameter(pos_emb)
         else:
             assert self.num_tokens == 1, 'Assuming one and only one token, [cls]'
@@ -217,13 +217,13 @@ class PriTEncoder(VisionTransformer):
 
     def forward_features(self, x):
         x = self.patch_embed(x)  # Bx(56x56)xL
-        if not self.use_mean_pooling:
+        if self.use_cls_token:
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
             x = torch.cat((cls_token, x), dim=1)
         x = self.pos_drop(x + self.pos_embed)
 
         # get grid-like patches
-        x_wo_cls_token = x if self.use_mean_pooling else x[:, 1:]
+        x_wo_cls_token = x[:, 1:] if self.use_cls_token else x
         x_wo_cls_token = self.grid_patches(x_wo_cls_token)  # Bx (7x7)x(8x8) xL
 
         # get visible tokens by random shuffle
@@ -235,12 +235,12 @@ class PriTEncoder(VisionTransformer):
             visible_tokens = x_wo_cls_token[:, shuffle[:num_visible]]    # Bx12x(8x8)xL
         visible_tokens = visible_tokens.flatten(1, 2)  # Bx(12x8x8)xL
 
-        if not self.use_mean_pooling:
+        if self.use_cls_token:
             visible_tokens = torch.cat((x[:, [0]], visible_tokens), dim=1)
 
         visible_tokens = self.blocks(visible_tokens)
         encoded_visible_patches = self.norm(visible_tokens)
-        if not self.use_mean_pooling:
+        if self.use_cls_token:
             encoded_visible_patches = encoded_visible_patches[:, 1:]  # w/o cls token
 
         return encoded_visible_patches, shuffle
