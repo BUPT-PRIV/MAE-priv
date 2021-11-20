@@ -5,6 +5,7 @@ from functools import partial, reduce
 from operator import mul
 
 from mae.vision_transformer import VisionTransformer
+from mae.pyramid_reconstruction_image_transformer import PriTEncoder
 from mae.layers import to_2tuple
 
 __all__ = [
@@ -226,4 +227,12 @@ def vit_conv_base(**kwargs):
         patch_size=16, embed_dim=768, depth=11, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), embed_layer=ConvStem, **kwargs)
     model.default_cfg = _cfg()
+    return model
+
+
+def prit_base(**kwargs):
+    model = PriTEncoder(
+        patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    model.default_cfg = _cfg(num_classes=0)
     return model

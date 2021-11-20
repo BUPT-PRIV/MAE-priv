@@ -1,0 +1,21 @@
+log_wandb: True
+wandb_experiment: 'PriT'
+
+# Architecture
+arch: 'prit_base'
+mae_dim: 256
+mae_depth: 1
+mae_norm_p: True
+
+# Training Hyparameter
+weight_decay: 0.05
+optimizer: 'adamw'
+sched: 'cosine'
+epochs: 400 # 800
+lr: 0.00015 # lr = batch_size * base_lr / 256
+batch_size: 4096
+gamma: 0.95
+warmup_epochs: 40 # 40
+cooldown_epochs: 0
+mean: [0.0, 0.0, 0.0]
+std: [1.0, 1.0, 1.0]
