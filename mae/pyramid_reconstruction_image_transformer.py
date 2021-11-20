@@ -5,18 +5,21 @@ from operator import mul
 import torch
 import torch.nn as nn
 
-from timm.models import (Block, PatchEmbed, VisionTransformer,
-                         named_apply, trunc_normal_, _init_vit_weights)
+from timm.models.vision_transformer import (Block, PatchEmbed,
+    VisionTransformer, named_apply, trunc_normal_, _init_vit_weights)
+from timm.models.layers import to_2tuple
 
 
 class PatchDownsample(nn.Module):
-    def __init__(self, dim_in, dim_out, visible_num, stride=2, norm_layer=partial(nn.LayerNorm, eps=1e-6)):
+    def __init__(self, dim_in, dim_out, num_visible, stride=2,
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cls_token=False):
         super().__init__()
 
         self.dim_in = dim_in
         self.dim_out = dim_out
-        self.visible_num = visible_num
+        self.num_visible = num_visible
         self.stride = stride
+        self.with_cls_token = with_cls_token
 
         if stride == 1:
             self.pool = None
@@ -29,20 +32,24 @@ class PatchDownsample(nn.Module):
         self.norm = norm_layer(dim_out)
 
     def forward(self, x):
-        B, N, L = x.shape  # N = BxLx(visible_num x grid_h x grid_w)
-        grid_h = grid_w = int((N // self.visible_num) ** 0.5)
-
         if self.pool is not None:
-            # get grid-like patches
-            x = x.permute([0, 2, 1])  # BxLxN
-            x = x.reshape(B, L, self.visible_num, grid_h, grid_w)  # BxLx12 x grid_h x grid_w
-            x = x.reshape(-1, grid_h, grid_w)  # (BxLx12) x grid_h x grid_w
+            x_wo_cls_token = x[:, 1:] if self.with_cls_token else x
 
-            x = self.pool(x)  # (BxLx12) x grid_h/2 x grid_w/2
+            B, N, L = x_wo_cls_token.shape  # N = BxLx(num_visible x grid_h x grid_w)
+            grid_h = grid_w = int((N // self.num_visible) ** 0.5)
+
+            # get grid-like patches
+            x_wo_cls_token = x_wo_cls_token.permute([0, 2, 1])  # BxLxN
+            x_wo_cls_token = x_wo_cls_token.reshape(B, L, self.num_visible, grid_h, grid_w)  # BxLx12 x grid_h x grid_w
+            x_wo_cls_token = x_wo_cls_token.reshape(-1, grid_h, grid_w)  # (BxLx12) x grid_h x grid_w
+
+            x_wo_cls_token = self.pool(x_wo_cls_token)  # (BxLx12) x grid_h/2 x grid_w/2
 
             # reshape
-            x = x.view(B, L, -1)  # BxLx(N/4)
-            x = x.permute([0, 2, 1])  # Bx(N/4)xL
+            x_wo_cls_token = x_wo_cls_token.view(B, L, -1)  # BxLx(N/4)
+            x_wo_cls_token = x_wo_cls_token.permute([0, 2, 1])  # Bx(N/4)xL
+
+            x = torch.cat((x[:, [0]], x_wo_cls_token), dim=1) if self.with_cls_token else x_wo_cls_token
 
         x = self.reduction(x)
         x = self.norm(x)
@@ -63,13 +70,16 @@ class PriTEncoder(VisionTransformer):
                  # args for PriT
                  strides=(2, 2, 2, 1), depths=(2, 3, 5, 2), dims=(96, 192, 384, 768),
                  mask_ratio=0.75, use_mean_pooling=True):
-        super().__init__()
+        # super(PriTEncoder, self).__init__()
+        super(VisionTransformer, self).__init__()
+
         self.num_classes = num_classes
         self.embed_dim = embed_dim  # num_features for consistency with other models
         self.num_features = dims[-1]  # update
         self.num_tokens = 0 if use_mean_pooling else 1
         norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
         act_layer = act_layer or nn.GELU
+        img_size = to_2tuple(img_size)
 
         # save args for build blocks
         self.num_heads = num_heads
@@ -82,32 +92,38 @@ class PriTEncoder(VisionTransformer):
         self.act_layer = act_layer
 
         assert self.embed_dim == dims[0]
+        self.num_layers = len(depths)
         self.mask_ratio = mask_ratio
         self.use_mean_pooling = use_mean_pooling
+        use_cls_token = not use_mean_pooling
 
         self.stride = stride = patch_size * reduce(mul, strides)  # 32 = 4 * 2 * 2 * 2 * 1
-        self.out_size = out_size = img_size // stride  # 7 = 224 / 32
-        self.num_patches = out_size ** 2  # 49 = 7 * 7
-        self.visible_num = int(self.num_patches * (1 - self.mask_ratio))  # 12 = ⎣49 * (1 - 0.75)⎦
+        self.out_size = out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 = 224 / 32
+        self.num_patches = out_size[0] * out_size[1]  # 49 = 7 * 7
+        self.num_visible = int(self.num_patches * (1 - self.mask_ratio))  # 12 = ⎣49 * (1 - 0.75)⎦
 
         self.grid_size = grid_size = stride // patch_size  # 8 = 32 / 4
-        grid_h, grid_w = self.patch_embed.grid_size  # 56 = img_size / patch_size = 224 / 4
-        self.split_shape = (grid_h // grid_size, grid_size, grid_w // grid_size, grid_size)  # (7, 8, 7, 8)
+        self.split_shape = (out_size[0], grid_size, out_size[1], grid_size)  # (7, 8, 7, 8)
 
         self.patch_embed = embed_layer(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+        grid_h, grid_w = self.patch_embed.grid_size
+        assert out_size[0] * grid_size == grid_h and out_size[1] * grid_size == grid_w
 
-        if not use_mean_pooling:
+        if use_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        self.pos_embed = self.build_2d_sincos_position_embedding(self.embed_dim)
+        self.pos_embed = self.build_2d_sincos_position_embedding(grid_h, grid_w, embed_dim)
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
-        for i, (depth, stride) in enumerate(zip(depths, strides)):
+        for i in range(self.num_layers):
+            downsample = i < len(depths) - 1 and (strides[i] == 2 or dims[i] != dims[i + 1])
             self.add_module(f'stage{i + 1}', nn.Sequential(
-                self._build_blocks(dims[i], depth, drop_path=dpr.pop()),
-                PatchDownsample(dims[i], dims[i + 1], self.visible_num, stride=stride, norm_layer=norm_layer),
+                self._build_blocks(dims[i], num_heads, depths[i], dpr=[dpr.pop() for _ in range(depths[i])]),
+                PatchDownsample(dims[i], dims[i + 1], self.num_visible, stride=strides[i],
+                    norm_layer=norm_layer, with_cls_token=use_cls_token) if downsample else nn.Identity(),
             ))
+        self.norm = norm_layer(self.num_features)
 
         # Classifier head(s)
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
@@ -124,7 +140,8 @@ class PriTEncoder(VisionTransformer):
                     nn.init.uniform_(m.weight, -val, val)
                 else:
                     nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
         if isinstance(self.patch_embed, PatchEmbed):
             # xavier_uniform initialization
@@ -132,15 +149,15 @@ class PriTEncoder(VisionTransformer):
             nn.init.uniform_(self.patch_embed.proj.weight, -val, val)
             nn.init.zeros_(self.patch_embed.proj.bias)
 
-    def _build_blocks(self, dim, depth, drop_path=0.):
+    def _build_blocks(self, dim, num_heads, depth, dpr=None):
+        dpr = dpr or ([0.] * depth)
         blocks = [Block(
-            dim=dim, num_heads=self.num_heads, mlp_ratio=self.mlp_ratio, qkv_bias=self.qkv_bias, drop=self.drop_rate,
-            attn_drop=self.attn_drop_rate, drop_path=drop_path, norm_layer=self.norm_layer, act_layer=self.act_layer)
-            for _ in range(depth)]
+            dim=dim, num_heads=num_heads, mlp_ratio=self.mlp_ratio, qkv_bias=self.qkv_bias, drop=self.drop_rate,
+            attn_drop=self.attn_drop_rate, drop_path=dpr[i], norm_layer=self.norm_layer, act_layer=self.act_layer)
+            for i in range(depth)]
         return nn.Sequential(*blocks)
 
-    def build_2d_sincos_position_embedding(self, embed_dim=768, temperature=10000., decode=False):
-        h, w = self.patch_embed.grid_size
+    def build_2d_sincos_position_embedding(self, h, w, embed_dim, temperature=10000., decode=False):
         grid_w = torch.arange(w, dtype=torch.float32)
         grid_h = torch.arange(h, dtype=torch.float32)
         grid_w, grid_h = torch.meshgrid(grid_w, grid_h)
@@ -185,15 +202,15 @@ class PriTEncoder(VisionTransformer):
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
     def blocks(self, x):
-        x1 = self.stage1(x)
-        x2 = self.stage2(x1)
-        x3 = self.stage3(x2)
-        x4 = self.stage4(x3)
-        return x4
+        out = []
+        for i in range(self.num_layers):
+            x = getattr(self, f'stage{i + 1}')(x)
+            out.append(x)
+        return x
 
     def grid_patches(self, x):
         B, N, L = x.shape
-        x = x.reshape(B, self.split_shape, L)         # Bx  (7x8x7x8)  xL
+        x = x.reshape(B, *self.split_shape, L)        # Bx  (7x8x7x8)  xL
         x = x.permute([0, 1, 3, 2, 4, 5])             # Bx   7x7x8x8   xL
         x = x.reshape(B, -1, self.grid_size ** 2, L)  # Bx (7x7)x(8x8) xL
         return x
@@ -213,12 +230,13 @@ class PriTEncoder(VisionTransformer):
         if self.mask_ratio == 0.:
             visible_tokens = x_wo_cls_token
         else:
-            visible_num = self.visible_num  # 12 = ⎣49 * (1 - 0.75)⎦
+            num_visible = self.num_visible  # 12 = ⎣49 * (1 - 0.75)⎦
             shuffle = torch.randperm(self.num_patches)  # 49 = 7 * 7
-            visible_tokens = x_wo_cls_token[:, shuffle[:visible_num]]    # Bx12x(8x8)xL
-        visible_tokens = visible_tokens.flatten(1, 3)  # Bx(12x8x8)xL
+            visible_tokens = x_wo_cls_token[:, shuffle[:num_visible]]    # Bx12x(8x8)xL
+        visible_tokens = visible_tokens.flatten(1, 2)  # Bx(12x8x8)xL
 
-        visible_tokens = x_wo_cls_token if self.use_mean_pooling else torch.cat((x[: 0], visible_tokens), dim=1)
+        if not self.use_mean_pooling:
+            visible_tokens = torch.cat((x[:, [0]], visible_tokens), dim=1)
 
         visible_tokens = self.blocks(visible_tokens)
         encoded_visible_patches = self.norm(visible_tokens)

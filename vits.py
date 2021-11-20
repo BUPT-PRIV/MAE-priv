@@ -230,9 +230,19 @@ def vit_conv_base(**kwargs):
     return model
 
 
+def prit_vit_base(**kwargs):
+    model = PriTEncoder(
+        patch_size=16, embed_dim=768, num_heads=12, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        strides=(1,), depths=(12,), dims=(768,), **kwargs)
+    model.default_cfg = _cfg(num_classes=0)
+    return model
+
+
 def prit_base(**kwargs):
     model = PriTEncoder(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        patch_size=4, embed_dim=96, num_heads=12, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        strides=(2, 2, 2, 1), depths=(2, 3, 5, 2), dims=(96, 192, 384, 768), **kwargs)
     model.default_cfg = _cfg(num_classes=0)
     return model
