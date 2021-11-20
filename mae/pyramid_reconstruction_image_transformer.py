@@ -69,7 +69,7 @@ class PriTEncoder(VisionTransformer):
                  embed_layer=PatchEmbed, norm_layer=None, act_layer=None, weight_init='',
                  # args for PriT
                  strides=(2, 2, 2, 1), depths=(2, 3, 5, 2), dims=(96, 192, 384, 768),
-                 mask_ratio=0.75, use_mean_pooling=True):
+                 mask_ratio=0.75, use_mean_pooling=True, pyramid_reconstruction=False):
         # super(PriTEncoder, self).__init__()
         super(VisionTransformer, self).__init__()
 
@@ -94,6 +94,7 @@ class PriTEncoder(VisionTransformer):
         assert self.embed_dim == dims[0]
         self.num_layers = len(depths)
         self.mask_ratio = mask_ratio
+        self.pyramid_reconstruction = pyramid_reconstruction
         self.use_mean_pooling = use_mean_pooling
         self.use_cls_token = use_cls_token = not use_mean_pooling
 
@@ -110,8 +111,7 @@ class PriTEncoder(VisionTransformer):
         grid_h, grid_w = self.patch_embed.grid_size
         assert out_size[0] * grid_size == grid_h and out_size[1] * grid_size == grid_w
 
-        if use_cls_token:
-            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) if use_cls_token else None
         self.pos_embed = self.build_2d_sincos_position_embedding(grid_h, grid_w, embed_dim)
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -201,19 +201,21 @@ class PriTEncoder(VisionTransformer):
         self.num_classes = num_classes
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
-    def blocks(self, x):
-        out = []
-        for i in range(self.num_layers):
-            x = getattr(self, f'stage{i + 1}')(x)
-            out.append(x)
-        return x
-
     def grid_patches(self, x):
         B, N, L = x.shape
         x = x.reshape(B, *self.split_shape, L)        # Bx  (7x8x7x8)  xL
         x = x.permute([0, 1, 3, 2, 4, 5])             # Bx   7x7x8x8   xL
         x = x.reshape(B, -1, self.grid_size ** 2, L)  # Bx (7x7)x(8x8) xL
         return x
+
+    def blocks(self, x):
+        out = []
+        for i in range(self.num_layers):
+            x = getattr(self, f'stage{i + 1}')(x)
+            if i == self.num_layers - 1:  # last block
+                x = self.norm(x)
+            out.append(x)
+        return out if self.pyramid_reconstruction else x
 
     def forward_features(self, x):
         x = self.patch_embed(x)  # Bx(56x56)xL
@@ -238,10 +240,14 @@ class PriTEncoder(VisionTransformer):
         if self.use_cls_token:
             visible_tokens = torch.cat((x[:, [0]], visible_tokens), dim=1)
 
-        visible_tokens = self.blocks(visible_tokens)
-        encoded_visible_patches = self.norm(visible_tokens)
+        encoded_visible_patches = self.blocks(visible_tokens)
+
+        # w/o cls token
         if self.use_cls_token:
-            encoded_visible_patches = encoded_visible_patches[:, 1:]  # w/o cls token
+            if self.pyramid_reconstruction:
+                encoded_visible_patches = [p[:, 1:] for p in encoded_visible_patches]
+            else:
+                encoded_visible_patches = encoded_visible_patches[:, 1:]
 
         return encoded_visible_patches, shuffle
 

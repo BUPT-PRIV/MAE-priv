@@ -104,10 +104,14 @@ class PriT(nn.Module):
     Build a PyramidReconstructionImageTransformer (PriT) model with a encoder and encoder
     """
 
-    def __init__(self, encoder, decoder_dim=512, decoder_depth=8, normalized_pixel=False):
+    def __init__(self, encoder, decoder_dim=512, decoder_depth=8,
+                 normalized_pixel=False, pyramid_reconstruction=False):
         super().__init__()
         self.encoder: PriTEncoder = encoder()
         self.normalized_pixel = normalized_pixel
+        self.pyramid_reconstruction = pyramid_reconstruction
+        if pyramid_reconstruction:
+            raise NotImplementedError
 
         stride = self.encoder.stride
         out_size = self.encoder.out_size
