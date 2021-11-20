@@ -94,18 +94,17 @@ class MAE(nn.Module):
         decoder_output = self.decoder(decoder_input)  # Bx(14*14)x512
         decoder_output = self.decoder_norm(decoder_output)
         decoder_output = self.decoder_linear_proj(decoder_output)  # Bx(14*14)x512 --> Bx(14*14)x(16*16*3)
-        decoder_output = decoder_output[:, shuffle[self.visible_size:], :]
+
         # target
         target = target.view(
             [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[1]]
         )  # Bx3x224x224 --> Bx3x16x14x16x14
         # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
         target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1, C)
-        target = target[:, shuffle[self.visible_size:], :, :]
         if self.normalized_pixel:
             mean = target.mean(dim=-2, keepdim=True)
             std = target.var(dim=-2, unbiased=True, keepdim=True).sqrt()
             target = (target - mean) / (std + 1e-6)
         target = target.view(B, self.num_patches, -1)
 
-        return self._mse_loss(decoder_output, target)
+        return self._mse_loss(decoder_output, target, masked_index=shuffle[self.visible_size:])
