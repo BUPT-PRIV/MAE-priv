@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .mix_mae import Mix_MAE
-from .pyramid_reconstruction_image_transformer import PriTEncoder, PriTDecoder
+from .pyramid_reconstruction_image_transformer import PriTEncoder, PriTDecoder, PriTDecoder2
 from .vision_transformer import Block
 
 
@@ -84,7 +84,8 @@ class MAE(nn.Module):
             std = target.var(dim=-2, unbiased=True, keepdim=True).sqrt()
             target = (target - mean) / (std + 1e-6)
 
-        target = target.flatten(2)  # Bx37x(32*32*C)
+        # B x 37 x (32*32) x C --> B x 37 x (32*32*C)
+        target = target.flatten(2)
         return target
 
     def forward(self, x):
@@ -113,11 +114,13 @@ class MAE(nn.Module):
         # target
         target = self.get_target(target)  # Bx(14*14)x(16*16*3)
 
-        masked_inds = shuffle[self.num_visible:]
-        return self.loss(decoder_output[:, masked_inds], target[:, masked_inds])
+        return self.loss(decoder_output, target, masked_inds=shuffle[self.num_visible:])
 
-    def loss(self, x, y):
-        return F.mse_loss(x, y)
+    def loss(self, x, y, masked_inds=None):
+        if masked_inds is not None:
+            return F.mse_loss(x[:, masked_inds], y[:, masked_inds], reduction="mean")
+        else:
+            return F.mse_loss(x, y, reduction="mean")
 
 
 class PriT(nn.Module):
@@ -133,16 +136,13 @@ class PriT(nn.Module):
 
         # build encoder
         self.encoder: PriTEncoder = encoder(pyramid_reconstruction=pyramid_reconstruction)
-
         self.num_patches = self.encoder.num_patches
         self.num_visible = self.encoder.num_visible
-        if pyramid_reconstruction:
-            raise NotImplementedError
-        else:
-            self.stage_idx = self.encoder.num_layers
 
         # build decoder
-        self.decoder = PriTDecoder(self.encoder, self.stage_idx,
+        decoder = PriTDecoder2 if pyramid_reconstruction else PriTDecoder
+        stage_idx = 1 if pyramid_reconstruction else self.encoder.num_layers
+        self.decoder = decoder(self.encoder, stage_idx,
             decoder_dim=decoder_dim, decoder_depth=decoder_depth)
 
     def get_target(self, img, masked_inds=None) -> torch.Tensor:
@@ -167,12 +167,12 @@ class PriT(nn.Module):
 
     def forward(self, x):
         # encode visible patches
-        encoded_visible_patches_multi_stages, shuffle = self.encoder(x)  # Bx12xL
-        if not self.pyramid_reconstruction:
-            encoded_visible_patches = encoded_visible_patches_multi_stages[-1]
-        else:
-            raise NotImplementedError
+        # [Bx(12*8*8)xL, Bx(12*4*4)xL, Bx(12*2*2)xL, Bx(12*1*1)xL]
+        encoded_visible_patches_multi_stages, shuffle = self.encoder(x)
+        encoded_visible_patches = (encoded_visible_patches_multi_stages
+            if self.pyramid_reconstruction else encoded_visible_patches_multi_stages[-1])
 
+        # decode
         decoded_masked_tokens = self.decoder(encoded_visible_patches, shuffle)  # Bx(M*G)x(S*S*C)
 
         # generate target

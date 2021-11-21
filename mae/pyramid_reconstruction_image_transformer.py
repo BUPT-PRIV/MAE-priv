@@ -4,6 +4,7 @@ from operator import mul
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from timm.models.vision_transformer import (Block, PatchEmbed,
     VisionTransformer, named_apply, trunc_normal_, _init_vit_weights)
@@ -35,24 +36,49 @@ class PatchDownsample(nn.Module):
         if self.pool is not None:
             x_wo_cls_token = x[:, 1:] if self.with_cls_token else x
 
-            B, N, L = x_wo_cls_token.shape  # N = BxLx(num_visible x grid_h x grid_w)
-            grid_h = grid_w = int((N // self.num_visible) ** 0.5)
+            B, VG, L = x_wo_cls_token.shape  # 12, G=8*8, 4x4, 2x2, 1x1
+            Gh = Gw = int((VG // self.num_visible) ** 0.5)
 
             # get grid-like patches
-            x_wo_cls_token = x_wo_cls_token.permute([0, 2, 1])  # BxLxN
-            x_wo_cls_token = x_wo_cls_token.reshape(B, L, self.num_visible, grid_h, grid_w)  # BxLx12 x grid_h x grid_w
-            x_wo_cls_token = x_wo_cls_token.reshape(-1, grid_h, grid_w)  # (BxLx12) x grid_h x grid_w
+            x_wo_cls_token = x_wo_cls_token.permute(0, 2, 1)  # BxLxVG
+            x_wo_cls_token = x_wo_cls_token.reshape(B, -1, Gh, Gw)  # Bx(L*V)xGhxGw
 
-            x_wo_cls_token = self.pool(x_wo_cls_token)  # (BxLx12) x grid_h/2 x grid_w/2
+            x_wo_cls_token = self.pool(x_wo_cls_token)  # Bx(LxV)x Gh/2 x Gw/2
 
             # reshape
-            x_wo_cls_token = x_wo_cls_token.view(B, L, -1)  # BxLx(N/4)
-            x_wo_cls_token = x_wo_cls_token.permute([0, 2, 1])  # Bx(N/4)xL
+            x_wo_cls_token = x_wo_cls_token.view(B, L, -1)  # BxLx(VG/4)
+            x_wo_cls_token = x_wo_cls_token.permute(0, 2, 1)  # Bx(VG/4)xL
 
             x = torch.cat((x[:, [0]], x_wo_cls_token), dim=1) if self.with_cls_token else x_wo_cls_token
 
         x = self.reduction(x)
         x = self.norm(x)
+        return x
+
+
+class PatchUpsample(nn.Module):
+    def __init__(self, num_visible, stride=2):
+        super().__init__()
+
+        if stride != 2:
+            raise ValueError(stride)
+
+        self.num_visible = num_visible
+        self.stride = stride
+        self.upsampler = partial(F.interpolate, scale_factor=stride, mode='bilinear', align_corners=False)
+
+    def forward(self, x):
+        B, VG, L = x.shape
+        Gh = Gw = int((VG // self.num_visible) ** 0.5)
+
+        x = x.permute(0, 2, 1)
+        x = x.reshape(B, -1, Gh, Gw)
+        x = self.upsampler(x)
+
+        # reshape
+        x = x.view(B, L, -1)  # BxLx(Gh*2*Gw*2)
+        x = x.permute(0, 2, 1)
+
         return x
 
 
@@ -273,6 +299,7 @@ class PriTDecoder(nn.Module):
         num_heads = decoder_dim // (num_features // encoder.num_heads)
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
+        self.num_masked = encoder.num_masked  # 37
 
         # build encoder linear projection
         self.encoder_linear_proj = nn.Linear(num_features, decoder_dim)
@@ -327,9 +354,8 @@ class PriTDecoder(nn.Module):
         G = encoded_visible_patches.size(2)  # G = grid_h * grid_w = Gh * Gw
 
         # un-shuffle
-        num_masked = self.num_patches - self.num_visible
         masked_inds = shuffle[self.num_visible:]
-        mask_token = self.mask_token.expand(x.size(0), num_masked, G, -1)  # B x M x G x D
+        mask_token = self.mask_token.expand(x.size(0), self.num_masked, G, -1)  # B x M x G x D
         all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # B x P x G x D
         all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x G x D
 
@@ -340,7 +366,7 @@ class PriTDecoder(nn.Module):
         # decode all tokens
         decoded_all_tokens = self.decoder_blocks(all_tokens)  # B x (P*G) x D
         decoded_all_tokens = decoded_all_tokens.view(B, self.num_patches, -1, L)  # B x P x G x D
-        decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if num_masked > 0 else decoded_all_tokens  # B x M x G x D
+        decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x G x D
         decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # B x (M*G) x D
         decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x (M*G) x D
         decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C
@@ -351,5 +377,61 @@ class PriTDecoder(nn.Module):
         # decoded_masked_tokens = decoded_masked_tokens.view(B, -1, Gh, Gw, h, w, 3)  # B x M X Gh x Gw x (S*S) x C
         # decoded_masked_tokens = decoded_masked_tokens.permute([0, 1, 6, 2, 4, 3, 5])  # B x M X C x Gh x S x Gw x S
         # decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, Gh * h, Gw * w)  # B x (M*C) x (Gh*S) x (Gw*S)
+
+        return decoded_masked_tokens
+
+
+class PriTDecoder2(PriTDecoder):
+
+    def __init__(self, encoder: PriTEncoder, stage_idx, decoder_dim=512, decoder_depth=8):
+        super().__init__(encoder, stage_idx, decoder_dim=decoder_dim, decoder_depth=decoder_depth)
+
+        self.upsamplers = nn.ModuleList(
+            (nn.Identity() if stride == 1 else PatchUpsample(self.num_patches, stride=stride))
+            for stride in encoder.strides
+        )
+
+        # build encoder linear projection(s)
+        del self.encoder_linear_proj
+        self.encoder_linear_projs = nn.ModuleList(nn.Linear(dim, decoder_dim) for dim in encoder.dims)
+
+        # mask_token(s)
+        del self.mask_token
+        for i in range(encoder.num_layers):
+            setattr(self, f'mask_token{i + 1}', nn.Parameter(torch.zeros(1, 1, 1, decoder_dim)))
+
+    def forward(self, xs, shuffle):
+        upsampled = None
+        for i, x in enumerate(xs):
+            # encode visible patches
+            encoded_visible_patches = self.encoder_linear_projs[i](x)  # B x (V*G) x D
+            B, VG, L = encoded_visible_patches.shape
+            encoded_visible_patches = encoded_visible_patches.reshape(B, self.num_visible, -1, L)  # B x V x G x D
+            G = encoded_visible_patches.size(2)  # G = grid_h * grid_w = Gh * Gw
+
+            # un-shuffle
+            mask_token = getattr(self, f'mask_token{i + 1}')  # 1 x 1 x 1 x D
+            mask_token = mask_token.expand(x.size(0), self.num_masked, G, -1)  # B x M x G x D
+            all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # B x P x G x D
+            all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x G x D
+            all_tokens = all_tokens.reshape(B, -1, L)  # B x (P*G) x D
+
+            if upsampled is not None:
+                all_tokens = all_tokens + upsampled
+
+            # TODO add fpn-like Attention here
+
+            upsampled = self.upsamplers[i](all_tokens)
+
+        all_tokens = upsampled / len(xs)
+
+        # decode all tokens
+        masked_inds = shuffle[self.num_visible:]
+        decoded_all_tokens = self.decoder_blocks(all_tokens)  # B x (P*G) x D
+        decoded_all_tokens = decoded_all_tokens.view(B, self.num_patches, -1, L)  # B x P x G x D
+        decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x G x D
+        decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # B x (M*G) x D
+        decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x (M*G) x D
+        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C
 
         return decoded_masked_tokens
