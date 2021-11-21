@@ -140,12 +140,18 @@ class PriT(nn.Module):
         self.encoder_linear_proj = nn.Linear(num_features, decoder_dim)
 
         # build decoder
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
-        self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(
-            out_size[0], out_size[1], decoder_dim, decode=True)
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, 1, decoder_dim))
         self.decoder_blocks = self.encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
         self.decoder_norm = norm_layer(decoder_dim, eps=1e-6)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
+
+        # pos_embed
+        grid_size = self.encoder.stride // stride
+        split_shape = (out_size[0] // grid_size, grid_size, out_size[1] // grid_size, grid_size)
+        decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(
+            out_size[0], out_size[1], decoder_dim, decode=True)
+        self.decoder_pos_embed = nn.Parameter(
+            self.encoder.grid_patches(decoder_pos_embed, split_shape), requires_grad=False)
 
         # weight initialization for decoder, ViT (timm)
         self.init_weights()
@@ -183,22 +189,28 @@ class PriT(nn.Module):
         # encode visible patches
         encoded_visible_patches, shuffle = self.encoder(x)  # Bx12xL
         encoded_visible_patches = self.encoder_linear_proj(encoded_visible_patches)  # Bx12x decoder_dim
+        B, VG, L = encoded_visible_patches.shape
+        encoded_visible_patches = encoded_visible_patches.reshape(B, self.num_visible, -1, L)  # Bx12xGx decoder_dim
+        G = encoded_visible_patches.size(2)  # G = grid_h * grid_w, for stage4 output, G=1
 
         # un-shuffle
         num_masked = self.num_patches - self.num_visible
         masked_inds = shuffle[self.num_visible:]
-        mask_token = self.mask_token.expand(x.size(0), num_masked, -1)
-        all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # Bx12x decoder_dim + Bx37x decoder_dim --> Bx49x decoder_dim
-        all_tokens = all_tokens[:, shuffle.argsort()]
+        mask_token = self.mask_token.expand(x.size(0), num_masked, G, -1)  # Bx37xGx decoder_dim
+        all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # Bx49xGx decoder_dim
+        all_tokens = all_tokens[:, shuffle.argsort()]  # Bx49xGx decoder_dim
 
         # with positional embedding
         all_tokens = all_tokens + self.decoder_pos_embed
+        all_tokens = all_tokens.reshape(B, -1, L)  # Bx(49xG)x decoder_dim
 
         # decode all tokens
         decoded_all_tokens = self.decoder_blocks(all_tokens)  # Bx49x decoder_dim
+        decoded_all_tokens = decoded_all_tokens.view(B, self.num_patches, -1, L)  # Bx49xGx decoder_dim
         decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if num_masked > 0 else decoded_all_tokens
+        decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # Bx(37xG)xD
         decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)
-        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # Bx37x(32*32*3)
+        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # Bx(37xG)x(32*32*3)
 
         # generate target
         target = self.get_target(x)  # Bx49x(32*32*3)
