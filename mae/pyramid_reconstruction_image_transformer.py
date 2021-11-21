@@ -283,7 +283,7 @@ class PriTEncoder(VisionTransformer):
         return self.head(encoded_visible_patches), shuffle
 
 
-class PriTDecoder(nn.Module):
+class PriTDecoder1(nn.Module):
     """
     PyramidReconstructionImageTransformer Dncoder
     """
@@ -305,21 +305,12 @@ class PriTDecoder(nn.Module):
         self.encoder_linear_proj = nn.Linear(num_features, decoder_dim)
 
         # build decoder
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, 1, decoder_dim))
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
+        self.decoder_pos_embed = encoder.build_2d_sincos_position_embedding(
+            out_size[0], out_size[1], decoder_dim, decode=True)
         self.decoder_blocks = encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
-
-        # pos_embed
-        grid_size = encoder.stride // stride
-        split_shape = (out_size[0] // grid_size, grid_size, out_size[1] // grid_size, grid_size)
-        decoder_pos_embed = encoder.build_2d_sincos_position_embedding(
-            out_size[0], out_size[1], decoder_dim, decode=True)
-        self.decoder_pos_embed = nn.Parameter(
-            encoder.grid_patches(decoder_pos_embed, split_shape), requires_grad=False)
-
-        # weight initialization for decoder, ViT (timm)
-        self.init_weights()
 
         # weight initialization, MOCO v3
         for name, m in self.decoder_blocks.named_modules():
@@ -333,9 +324,6 @@ class PriTDecoder(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def init_weights(self):
-        self.apply(_init_vit_weights)
-
     def forward(self, x, shuffle):
         """
             B: batch size
@@ -347,58 +335,79 @@ class PriTDecoder(nn.Module):
             S: stride
         """
 
-        # encode visible patches
-        encoded_visible_patches = self.encoder_linear_proj(x)  # B x (V*G) x D
-        B, VG, L = encoded_visible_patches.shape
-        encoded_visible_patches = encoded_visible_patches.reshape(B, self.num_visible, -1, L)  # B x V x G x D
-        G = encoded_visible_patches.size(2)  # G = grid_h * grid_w = Gh * Gw
+        # encoder linear projection
+        encoded_visible_patches = self.encoder_linear_proj(x)  # B x V x D
 
         # un-shuffle
         masked_inds = shuffle[self.num_visible:]
-        mask_token = self.mask_token.expand(x.size(0), self.num_masked, G, -1)  # B x M x G x D
-        all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # B x P x G x D
-        all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x G x D
+        mask_token = self.mask_token.expand(x.size(0), self.num_masked, -1)  # B x M x D
+        all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # B x P x D = B x (V + M) x D
+        all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x D
 
         # with positional embedding
         all_tokens = all_tokens + self.decoder_pos_embed
-        all_tokens = all_tokens.reshape(B, -1, L)  # B x (P*G) x D
 
         # decode all tokens
-        decoded_all_tokens = self.decoder_blocks(all_tokens)  # B x (P*G) x D
-        decoded_all_tokens = decoded_all_tokens.view(B, self.num_patches, -1, L)  # B x P x G x D
-        decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x G x D
-        decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # B x (M*G) x D
-        decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x (M*G) x D
-        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C
-
-        # B, MG, OC = decoded_masked_tokens.shape
-        # Gh = Gw = int((MG // num_masked) ** 0.5)
-        # h = w = int((OC // 3) ** 0.5)
-        # decoded_masked_tokens = decoded_masked_tokens.view(B, -1, Gh, Gw, h, w, 3)  # B x M X Gh x Gw x (S*S) x C
-        # decoded_masked_tokens = decoded_masked_tokens.permute([0, 1, 6, 2, 4, 3, 5])  # B x M X C x Gh x S x Gw x S
-        # decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, Gh * h, Gw * w)  # B x (M*C) x (Gh*S) x (Gw*S)
+        decoded_all_tokens = self.decoder_blocks(all_tokens)  # B x P x D
+        decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x D
+        decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x M x D
+        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x M x 32*32*3
 
         return decoded_masked_tokens
 
 
-class PriTDecoder2(PriTDecoder):
+class PriTDecoder2(nn.Module):
 
     def __init__(self, encoder: PriTEncoder, stage_idx, decoder_dim=512, decoder_depth=8):
-        super().__init__(encoder, stage_idx, decoder_dim=decoder_dim, decoder_depth=decoder_depth)
+        super().__init__()
+        self.stage_idx = stage_idx
 
+        self.stride = stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
+        img_size = encoder.img_size  # 224
+        out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
+        num_features = encoder.dims[stage_idx - 1]
+        num_heads = decoder_dim // (num_features // encoder.num_heads)
+        self.num_patches = encoder.num_patches  # 49
+        self.num_visible = encoder.num_visible  # 12
+        self.num_masked = encoder.num_masked  # 37
+
+        # build encoder linear projection(s)
+        self.encoder_linear_projs = nn.ModuleList(nn.Linear(dim, decoder_dim) for dim in encoder.dims)
+
+        # mask token(s)
+        for i in range(encoder.num_layers):
+            setattr(self, f'mask_token{i + 1}', nn.Parameter(torch.zeros(1, 1, 1, decoder_dim)))
+
+        # pos_embed
+        grid_size = encoder.stride // stride
+        split_shape = (out_size[0] // grid_size, grid_size, out_size[1] // grid_size, grid_size)
+        decoder_pos_embed = encoder.build_2d_sincos_position_embedding(
+            out_size[0], out_size[1], decoder_dim, decode=True)
+        self.decoder_pos_embed = nn.Parameter(
+            encoder.grid_patches(decoder_pos_embed, split_shape), requires_grad=False)
+
+        # build upsampler(s)
         self.upsamplers = nn.ModuleList(
             (nn.Identity() if stride == 1 else PatchUpsample(self.num_patches, stride=stride))
             for stride in encoder.strides
         )
 
-        # build encoder linear projection(s)
-        del self.encoder_linear_proj
-        self.encoder_linear_projs = nn.ModuleList(nn.Linear(dim, decoder_dim) for dim in encoder.dims)
+        # build decoder
+        self.decoder_blocks = encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
+        self.decoder_norm = encoder.norm_layer(decoder_dim)
+        self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
-        # mask_token(s)
-        del self.mask_token
-        for i in range(encoder.num_layers):
-            setattr(self, f'mask_token{i + 1}', nn.Parameter(torch.zeros(1, 1, 1, decoder_dim)))
+        # weight initialization, MOCO v3
+        for name, m in self.decoder_blocks.named_modules():
+            if isinstance(m, nn.Linear):
+                if 'qkv' in name:
+                    # treat the weights of Q, K, V separately
+                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                    nn.init.uniform_(m.weight, -val, val)
+                else:
+                    nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, xs, shuffle):
         upsampled = None

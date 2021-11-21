@@ -193,7 +193,7 @@ def main_worker(gpu, ngpus_per_node, args):
         torch.distributed.barrier()
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = mae.builder.PriT(
+    model = mae.builder.PriT1(
         partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t, use_mean_pooling=args.use_mean_pooling),
         decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
 
