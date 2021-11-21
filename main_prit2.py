@@ -34,7 +34,7 @@ torchvision_model_names = sorted(name for name in torchvision_models.__dict__
                                  if name.islower() and not name.startswith("__")
                                  and callable(torchvision_models.__dict__[name]))
 
-model_names = ['prit_vit_base', 'vit_small', 'vit_base', 'vit_large', 'vit_conv_small', 'vit_conv_base'] + torchvision_model_names
+model_names = ['vit_small', 'vit_base', 'vit_large', 'vit_conv_small', 'vit_conv_base'] + torchvision_model_names
 
 config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)
 parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
@@ -193,7 +193,7 @@ def main_worker(gpu, ngpus_per_node, args):
         torch.distributed.barrier()
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = mae.builder.PriT1(
+    model = mae.builder.PriT2(
         partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t, use_mean_pooling=args.use_mean_pooling),
         decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
 
