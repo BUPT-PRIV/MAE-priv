@@ -61,7 +61,7 @@ parser.add_argument('-b', '--batch-size', default=4096, type=int,
                          'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--lr', '--learning-rate', default=0.00015, type=float,
                     metavar='LR', help='initial (base) learning rate', dest='lr')
-parser.add_argument('--min-lr', '--learning-rate', default=0.0, type=float,
+parser.add_argument('--min-lr', default=0.0, type=float,
                     help='minimum learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
