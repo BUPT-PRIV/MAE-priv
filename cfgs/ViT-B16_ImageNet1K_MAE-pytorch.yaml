@@ -1,0 +1,22 @@
+log_wandb: True
+wandb_experiment: 'MAE'
+
+# Architecture
+arch: 'vit_base'
+mae_dim: 384
+mae_depth: 4
+mae_norm_p: True
+
+# Training Hyparameter
+weight_decay: 0.05
+optimizer: 'adamw'
+sched: 'cosine'
+epochs: 400 # 800
+lr: 0.00015 # lr = batch_size * base_lr / 256
+min_lr: 1e-5
+batch_size: 4096
+gamma: 0.95
+warmup_epochs: 40 # 40
+
+mean: [0.485, 0.456, 0.406]
+std: [0.229, 0.224, 0.225]
