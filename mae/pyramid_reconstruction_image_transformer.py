@@ -23,7 +23,7 @@ class PatchDownsample(nn.Module):
 
         if stride == 1:
             self.pool = None
-        if stride == 2:
+        elif stride == 2:
             self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
         else:
             raise ValueError(stride)
@@ -68,7 +68,7 @@ class PriTEncoder(VisionTransformer):
                  mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
                  embed_layer=PatchEmbed, norm_layer=None, act_layer=None, weight_init='',
                  # args for PriT
-                 strides=(2, 2, 2, 1), depths=(2, 3, 5, 2), dims=(96, 192, 384, 768),
+                 strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
                  mask_ratio=0.75, use_mean_pooling=True, pyramid_reconstruction=False):
         # super(PriTEncoder, self).__init__()
         super(VisionTransformer, self).__init__()
@@ -79,7 +79,7 @@ class PriTEncoder(VisionTransformer):
         self.num_tokens = 0 if use_mean_pooling else 1
         norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
         act_layer = act_layer or nn.GELU
-        img_size = to_2tuple(img_size)
+        self.img_size = img_size = to_2tuple(img_size)
 
         # save args for build blocks
         self.num_heads = num_heads
@@ -93,6 +93,9 @@ class PriTEncoder(VisionTransformer):
 
         assert self.embed_dim == dims[0]
         self.num_layers = len(depths)
+        self.patch_size = patch_size
+        self.strides = strides
+        self.dims = dims
         self.mask_ratio = mask_ratio
         self.pyramid_reconstruction = pyramid_reconstruction
         self.use_mean_pooling = use_mean_pooling
@@ -102,8 +105,9 @@ class PriTEncoder(VisionTransformer):
         self.out_size = out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 = 224 / 32
         self.num_patches = out_size[0] * out_size[1]  # 49 = 7 * 7
         self.num_visible = int(self.num_patches * (1 - self.mask_ratio))  # 12 = ⎣49 * (1 - 0.75)⎦
+        self.num_masked = self.num_patches - self.num_visible  # 37 = 49 - 12
 
-        self.grid_size = grid_size = stride // patch_size  # 8 = 32 / 4
+        grid_size = stride // patch_size  # 8 = 32 / 4
         self.split_shape = (out_size[0], grid_size, out_size[1], grid_size)  # (7, 8, 7, 8)
 
         self.patch_embed = embed_layer(
@@ -117,11 +121,11 @@ class PriTEncoder(VisionTransformer):
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
         for i in range(self.num_layers):
-            downsample = i < len(depths) - 1 and (strides[i] == 2 or dims[i] != dims[i + 1])
+            downsample = i > 0 and (strides[i] == 2 or dims[i - 1] != dims[i])
             self.add_module(f'stage{i + 1}', nn.Sequential(
-                self._build_blocks(dims[i], num_heads, depths[i], dpr=[dpr.pop() for _ in range(depths[i])]),
-                PatchDownsample(dims[i], dims[i + 1], self.num_visible, stride=strides[i],
+                PatchDownsample(dims[i - 1], dims[i], self.num_visible, stride=strides[i],
                     norm_layer=norm_layer, with_cls_token=use_cls_token) if downsample else nn.Identity(),
+                self._build_blocks(dims[i], num_heads, depths[i], dpr=[dpr.pop() for _ in range(depths[i])]),
             ))
         self.norm = norm_layer(self.num_features)
 
@@ -201,11 +205,11 @@ class PriTEncoder(VisionTransformer):
         self.num_classes = num_classes
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
-    def grid_patches(self, x):
+    def grid_patches(self, x, split_shape):
         B, N, L = x.shape
-        x = x.reshape(B, *self.split_shape, L)        # Bx  (7x8x7x8)  xL
-        x = x.permute([0, 1, 3, 2, 4, 5])             # Bx   7x7x8x8   xL
-        x = x.reshape(B, -1, self.grid_size ** 2, L)  # Bx (7x7)x(8x8) xL
+        x = x.reshape(B, *split_shape, L)               # Bx  (7x8x7x8)  xL
+        x = x.permute([0, 1, 3, 2, 4, 5])               # Bx   7x7x8x8   xL
+        x = x.reshape(B, x.size(1) * x.size(2), -1, L)  # Bx (7x7)x(8x8) xL
         return x
 
     def blocks(self, x):
@@ -226,7 +230,7 @@ class PriTEncoder(VisionTransformer):
 
         # get grid-like patches
         x_wo_cls_token = x[:, 1:] if self.use_cls_token else x
-        x_wo_cls_token = self.grid_patches(x_wo_cls_token)  # Bx (7x7)x(8x8) xL
+        x_wo_cls_token = self.grid_patches(x_wo_cls_token, self.split_shape)  # Bx (7x7)x(8x8) xL
 
         # get visible tokens by random shuffle
         if self.mask_ratio == 0.:
