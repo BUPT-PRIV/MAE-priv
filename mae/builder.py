@@ -59,7 +59,8 @@ class MAE(nn.Module):
                     nn.init.uniform_(m.weight, -val, val)
                 else:
                     nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def _build_decoder(self, decoder_dim=512, decoder_head=8, decoder_depth=8):
         blocks = [
