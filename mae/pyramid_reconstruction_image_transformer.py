@@ -137,7 +137,7 @@ class PriTEncoder(nn.Module):
                  # default value of `patch_size` and `embed_dim` changed.
                  img_size=224, patch_size=4, in_chans=3, embed_dim=96, num_heads=12,
                  mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
-                 embed_layer=PatchEmbed, norm_layer=None, act_layer=None, weight_init='',
+                 embed_layer=PatchEmbed, norm_layer=None, act_layer=None, weight_init='moco_v3',
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
                  mask_ratio=0.75, use_mean_pooling=True, pyramid_reconstruction=False):
@@ -331,14 +331,14 @@ class PriTEncoder(nn.Module):
 
 class PriTDecoder1(nn.Module):
     """
-    PyramidReconstructionImageTransformer Dncoder
+    PyramidReconstructionImageTransformer Decoder
     """
 
-    def __init__(self, encoder: PriTEncoder, stage_idx, decoder_dim=512, decoder_depth=8):
+    def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, weight_init='moco_v3'):
         super().__init__()
-        self.stage_idx = stage_idx
+        stage_idx = encoder.num_layers  # 4
 
-        self.stride = stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
         num_features = encoder.dims[stage_idx - 1]
@@ -347,26 +347,36 @@ class PriTDecoder1(nn.Module):
         self.num_visible = encoder.num_visible  # 12
         self.num_masked = encoder.num_masked  # 37
 
-        # build encoder linear projection
+        # build encoder linear projection(s) and mask token(s)
         self.encoder_linear_proj = nn.Linear(num_features, decoder_dim)
-
-        # build decoder
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
+
+        # pos_embed
         self.decoder_pos_embed = encoder.build_2d_sincos_position_embedding(
             out_size[0], out_size[1], decoder_dim, decode=True)
+
+        # build decoder
         self.decoder_blocks = encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
+        # weight initialization
+        self.init_weights(weight_init)
+
+    def init_weights(self, mode='moco_v3'):
+        assert mode in {'moco_v3', 'timm'}
         # weight initialization, MOCO v3
-        for name, m in self.decoder_blocks.named_modules():
+        for name, m in self.named_modules():
             if isinstance(m, nn.Linear):
-                if 'qkv' in name:
-                    # treat the weights of Q, K, V separately
-                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
-                    nn.init.uniform_(m.weight, -val, val)
-                else:
-                    nn.init.xavier_uniform_(m.weight)
+                if mode == 'moco_v3':
+                    if 'qkv' in name:
+                        # treat the weights of Q, K, V separately
+                        val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                        nn.init.uniform_(m.weight, -val, val)
+                    else:
+                        nn.init.xavier_uniform_(m.weight)
+                elif mode == 'timm':
+                    nn.init.trunc_normal_(m.weight, std=.02)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
@@ -403,12 +413,15 @@ class PriTDecoder1(nn.Module):
 
 
 class PriTDecoder2(nn.Module):
+    """
+    PyramidReconstructionImageTransformer Decoder
+    """
 
-    def __init__(self, encoder: PriTEncoder, stage_idx, decoder_dim=512, decoder_depth=8):
+    def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, weight_init='moco_v3'):
         super().__init__()
-        self.stage_idx = stage_idx
+        stage_idx = 1
 
-        self.stride = stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
         num_features = encoder.dims[stage_idx - 1]
@@ -417,12 +430,12 @@ class PriTDecoder2(nn.Module):
         self.num_visible = encoder.num_visible  # 12
         self.num_masked = encoder.num_masked  # 37
 
-        # build encoder linear projection(s)
-        self.encoder_linear_projs = nn.ModuleList(nn.Linear(dim, decoder_dim) for dim in encoder.dims)
-
-        # mask token(s)
-        for i in range(encoder.num_layers):
-            setattr(self, f'mask_token{i + 1}', nn.Parameter(torch.zeros(1, 1, 1, decoder_dim)))
+        # build encoder linear projection(s), mask token(s) and upsampler(s)
+        for stage_idx, (dim, s) in enumerate(zip(encoder.dims, encoder.strides), 1):
+            setattr(self, f'encoder_linear_proj{stage_idx}', nn.Linear(dim, decoder_dim))
+            setattr(self, f'mask_token{stage_idx}', nn.Parameter(torch.zeros(1, 1, 1, decoder_dim)))
+            setattr(self, f'upsampler{stage_idx}', 
+                nn.Identity() if s == 1 else PatchUpsample(self.num_patches, stride=s))
 
         # pos_embed
         grid_size = encoder.stride // stride
@@ -432,40 +445,55 @@ class PriTDecoder2(nn.Module):
         self.decoder_pos_embed = nn.Parameter(
             encoder.grid_patches(decoder_pos_embed, split_shape), requires_grad=False)
 
-        # build upsampler(s)
-        self.upsamplers = nn.ModuleList(
-            (nn.Identity() if stride == 1 else PatchUpsample(self.num_patches, stride=stride))
-            for stride in encoder.strides
-        )
-
         # build decoder
         self.decoder_blocks = encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
+        # weight initialization
+        self.init_weights(weight_init)
+
+    def init_weights(self, mode='moco_v3'):
+        assert mode in {'moco_v3', 'timm'}
         # weight initialization, MOCO v3
-        for name, m in self.decoder_blocks.named_modules():
+        for name, m in self.named_modules():
             if isinstance(m, nn.Linear):
-                if 'qkv' in name:
-                    # treat the weights of Q, K, V separately
-                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
-                    nn.init.uniform_(m.weight, -val, val)
-                else:
-                    nn.init.xavier_uniform_(m.weight)
+                if mode == 'moco_v3':
+                    if 'qkv' in name:
+                        # treat the weights of Q, K, V separately
+                        val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                        nn.init.uniform_(m.weight, -val, val)
+                    else:
+                        nn.init.xavier_uniform_(m.weight)
+                elif mode == 'timm':
+                    nn.init.trunc_normal_(m.weight, std=.02)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
     def forward(self, xs, shuffle):
+        """
+            B: batch size
+            V: num_visible
+            M: num_masked
+            P: num_patches, P=V+M
+            G: grid_h * grid_w = Gh * Gw
+            D: decoder_dim
+            S: stride
+        """
+
         upsampled = None
-        for i, x in enumerate(xs):
+        for i, x in enumerate(xs[::-1]):
+            stage_idx = len(xs) - i
+
             # encode visible patches
-            encoded_visible_patches = self.encoder_linear_projs[i](x)  # B x (V*G) x D
+            encoder_linear_proj = getattr(self, f'encoder_linear_proj{stage_idx}')
+            encoded_visible_patches = encoder_linear_proj(x)  # B x (V*G) x D
             B, VG, L = encoded_visible_patches.shape
-            encoded_visible_patches = encoded_visible_patches.reshape(B, self.num_visible, -1, L)  # B x V x G x D
-            G = encoded_visible_patches.size(2)  # G = grid_h * grid_w = Gh * Gw
+            G = VG // self.num_visible
+            encoded_visible_patches = encoded_visible_patches.reshape(B, -1, G, L)  # B x V x G x D
 
             # un-shuffle
-            mask_token = getattr(self, f'mask_token{i + 1}')  # 1 x 1 x 1 x D
+            mask_token = getattr(self, f'mask_token{stage_idx}')  # 1 x 1 x 1 x D
             mask_token = mask_token.expand(x.size(0), self.num_masked, G, -1)  # B x M x G x D
             all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # B x P x G x D
             all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x G x D
@@ -476,7 +504,7 @@ class PriTDecoder2(nn.Module):
 
             # TODO add fpn-like Attention here
 
-            upsampled = self.upsamplers[i](all_tokens)
+            upsampled = getattr(self, f'upsampler{stage_idx}')(all_tokens)  # B x N x D
 
         all_tokens = upsampled / len(xs)
 
@@ -487,6 +515,6 @@ class PriTDecoder2(nn.Module):
         decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x G x D
         decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # B x (M*G) x D
         decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x (M*G) x D
-        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C
+        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C = B x (37*8*8) x (4*4*3)
 
         return decoded_masked_tokens

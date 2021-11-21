@@ -137,8 +137,8 @@ class PriT1(nn.Module):
         self.num_visible = self.encoder.num_visible
 
         # build decoder
-        self.decoder = PriTDecoder1(self.encoder, self.encoder.num_layers,
-            decoder_dim=decoder_dim, decoder_depth=decoder_depth)
+        self.decoder = PriTDecoder1(
+            self.encoder, decoder_dim=decoder_dim, decoder_depth=decoder_depth)
 
     def get_target(self, img, masked_inds=None) -> torch.Tensor:
         B, C, H, W = img.shape
@@ -159,6 +159,16 @@ class PriT1(nn.Module):
         return target
 
     def forward(self, x):
+        """
+            B: batch size
+            V: num_visible
+            M: num_masked
+            P: num_patches, P=V+M
+            G: grid_h * grid_w = Gh * Gw
+            D: decoder_dim
+            S: stride
+        """
+
         # encode visible patches
         encoded_visible_patches_multi_stages, shuffle = self.encoder(x)
         encoded_visible_patches = encoded_visible_patches_multi_stages[-1]  # Bx(12*1*1)xL
@@ -190,8 +200,8 @@ class PriT2(nn.Module):
         self.num_visible = self.encoder.num_visible
 
         # build decoder
-        self.decoder = PriTDecoder2(self.encoder, 1,
-            decoder_dim=decoder_dim, decoder_depth=decoder_depth)
+        self.decoder = PriTDecoder2(
+            self.encoder, decoder_dim=decoder_dim, decoder_depth=decoder_depth)
 
     def get_target(self, img, masked_inds=None) -> torch.Tensor:
         B, C, H, W = img.shape
@@ -214,8 +224,18 @@ class PriT2(nn.Module):
         return target
 
     def forward(self, x):
+        """
+            B: batch size
+            V: num_visible
+            M: num_masked
+            P: num_patches, P=V+M
+            G: grid_h * grid_w = Gh * Gw
+            D: decoder_dim
+            S: stride
+        """
+
         # encode visible patches
-        # [Bx(12*8*8)xL, Bx(12*4*4)xL, Bx(12*2*2)xL, Bx(12*1*1)xL]
+        # [Bx(V*8*8)xC1, Bx(V*4*4)xC2, Bx(V*2*2)xC3, Bx(V*1*1)xC4]
         encoded_visible_patches_multi_stages, shuffle = self.encoder(x)
 
         # decode
