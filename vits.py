@@ -241,7 +241,7 @@ def prit_vit_base(**kwargs):
 
 def prit_base(**kwargs):
     model = PriTEncoder(
-        patch_size=4, embed_dim=96, num_heads=12, mlp_ratio=4, qkv_bias=True,
+        patch_size=4, embed_dim=48, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384), **kwargs)
     model.default_cfg = _cfg(num_classes=0)

@@ -187,7 +187,7 @@ class PriT(nn.Module):
         # un-shuffle
         num_masked = self.num_patches - self.num_visible
         masked_inds = shuffle[self.num_visible:]
-        mask_token = self.mask_token.repeat([x.size(0), num_masked, 1])
+        mask_token = self.mask_token.expand(x.size(0), num_masked, -1)
         all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # Bx12x decoder_dim + Bx37x decoder_dim --> Bx49x decoder_dim
         all_tokens = all_tokens[:, shuffle.argsort()]
 
@@ -195,16 +195,16 @@ class PriT(nn.Module):
         all_tokens = all_tokens + self.decoder_pos_embed
 
         # decode all tokens
-        decoded_all_token = self.decoder_blocks(all_tokens)  # Bx49x decoder_dim
-        decoded_masked_token = decoded_all_token[:, masked_inds] if num_masked > 0 else decoded_all_token
-        decoded_masked_token = self.decoder_norm(decoded_masked_token)
-        decoded_masked_token = self.decoder_linear_proj(decoded_masked_token)  # Bx37x(32*32*3)
+        decoded_all_tokens = self.decoder_blocks(all_tokens)  # Bx49x decoder_dim
+        decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if num_masked > 0 else decoded_all_tokens
+        decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)
+        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # Bx37x(32*32*3)
 
         # generate target
         target = self.get_target(x)  # Bx49x(32*32*3)
         masked_target = target[:, masked_inds] if num_masked > 0 else target
 
-        return self.loss(decoded_masked_token, masked_target)
+        return self.loss(decoded_masked_tokens, masked_target)
 
     def loss(self, img, target):
         return F.mse_loss(img, target)

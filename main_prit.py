@@ -251,7 +251,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 # Map model to be loaded to specified single gpu.
                 loc = 'cuda:{}'.format(args.gpu)
                 checkpoint = torch.load(args.resume, map_location=loc)
-            args.start_epoch = checkpoint['epoch']
+            args.start_epoch = checkpoint['epoch'] - 1
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             scaler.load_state_dict(checkpoint['scaler'])
@@ -293,9 +293,9 @@ def main_worker(gpu, ngpus_per_node, args):
                                      args.arch,
                                      datetime.now().strftime("%Y%m%d-%H%M%S"), ])
         if not os.path.exists('output'):
-            os.mkdir('output')
+            os.makedirs('output')
         if not os.path.exists(ckpt):
-            os.mkdir(ckpt)
+            os.makedirs(ckpt)
 
     train_start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
@@ -307,7 +307,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                                                     and args.rank == 0):  # only the first GPU saves checkpoint
-            if epoch % args.save_freq == 0:
+            if epoch % args.save_freq == 0 or epoch == (args.epoch - 1):
                 save_checkpoint({
                     'epoch': epoch + 1,
                     'arch': args.arch,

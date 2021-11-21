@@ -244,7 +244,7 @@ class PriTEncoder(VisionTransformer):
         if self.use_cls_token:
             visible_tokens = torch.cat((x[:, [0]], visible_tokens), dim=1)
 
-        encoded_visible_patches = self.blocks(visible_tokens)
+        encoded_visible_patches = self.blocks(visible_tokens)  # Bx(12*s*s)xL
 
         # w/o cls token
         if self.use_cls_token:
