@@ -257,7 +257,7 @@ class PriTEncoder(VisionTransformer):
         return self.head(encoded_visible_patches), shuffle
 
 
-class PriTDncoder(nn.Module):
+class PriTDecoder(nn.Module):
     """
     PyramidReconstructionImageTransformer Dncoder
     """
@@ -266,7 +266,7 @@ class PriTDncoder(nn.Module):
         super().__init__()
         self.stage_idx = stage_idx
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
+        self.stride = stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
         num_features = encoder.dims[stage_idx - 1]
@@ -315,16 +315,16 @@ class PriTDncoder(nn.Module):
             V: num_visible
             M: num_masked
             P: num_patches, P=V+M
-            G: grid_h * grid_w
+            G: grid_h * grid_w = Gh * Gw
             D: decoder_dim
-            O: if pyramid_reconstruction is True, O=patch_size * patch_size; else O=stride * stride.
+            S: stride
         """
 
         # encode visible patches
         encoded_visible_patches = self.encoder_linear_proj(x)  # B x (V*G) x D
         B, VG, L = encoded_visible_patches.shape
         encoded_visible_patches = encoded_visible_patches.reshape(B, self.num_visible, -1, L)  # B x V x G x D
-        G = encoded_visible_patches.size(2)  # G = grid_h * grid_w
+        G = encoded_visible_patches.size(2)  # G = grid_h * grid_w = Gh * Gw
 
         # un-shuffle
         num_masked = self.num_patches - self.num_visible
@@ -343,6 +343,13 @@ class PriTDncoder(nn.Module):
         decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if num_masked > 0 else decoded_all_tokens  # B x M x G x D
         decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # B x (M*G) x D
         decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x (M*G) x D
-        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x O*3
+        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C
+
+        # B, MG, OC = decoded_masked_tokens.shape
+        # Gh = Gw = int((MG // num_masked) ** 0.5)
+        # h = w = int((OC // 3) ** 0.5)
+        # decoded_masked_tokens = decoded_masked_tokens.view(B, -1, Gh, Gw, h, w, 3)  # B x M X Gh x Gw x (S*S) x C
+        # decoded_masked_tokens = decoded_masked_tokens.permute([0, 1, 6, 2, 4, 3, 5])  # B x M X C x Gh x S x Gw x S
+        # decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, Gh * h, Gw * w)  # B x (M*C) x (Gh*S) x (Gw*S)
 
         return decoded_masked_tokens

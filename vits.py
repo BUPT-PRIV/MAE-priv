@@ -53,7 +53,7 @@ class PatchEmbed(nn.Module):
         return x
 
 
-class VisionTransformerDecoder(VisionTransformer):
+class VisionTransformerEncoder(VisionTransformer):
     def __init__(self, mask_ratio=0.75, use_mean_pooling=False, **kwargs):
         super().__init__(**kwargs)
 
@@ -181,7 +181,7 @@ class ConvStem(nn.Module):
 
 
 def vit_small(**kwargs):
-    model = VisionTransformerDecoder(
+    model = VisionTransformerEncoder(
         patch_size=16, embed_dim=384, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     model.default_cfg = _cfg()
@@ -189,7 +189,7 @@ def vit_small(**kwargs):
 
 
 def vit_base(**kwargs):
-    model = VisionTransformerDecoder(
+    model = VisionTransformerEncoder(
         patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     model.default_cfg = _cfg()
@@ -197,7 +197,7 @@ def vit_base(**kwargs):
 
 
 def vit_large(**kwargs):
-    model = VisionTransformerDecoder(
+    model = VisionTransformerEncoder(
         patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     model.default_cfg = _cfg()
@@ -206,7 +206,7 @@ def vit_large(**kwargs):
 
 def vit_conv_small(**kwargs):
     # minus one ViT block
-    model = VisionTransformerDecoder(
+    model = VisionTransformerEncoder(
         patch_size=16, embed_dim=384, depth=11, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), embed_layer=ConvStem, **kwargs)
     model.default_cfg = _cfg()
@@ -215,7 +215,7 @@ def vit_conv_small(**kwargs):
 
 def vit_conv_base(**kwargs):
     # minus one ViT block
-    model = VisionTransformerDecoder(
+    model = VisionTransformerEncoder(
         patch_size=16, embed_dim=768, depth=11, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), embed_layer=ConvStem, **kwargs)
     model.default_cfg = _cfg()
