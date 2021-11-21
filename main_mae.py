@@ -25,7 +25,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import utils
 import mae.builder
-from utils import setup_default_logging
+from utils import setup_default_logging, create_optimizer
 import vits
 
 _logger = logging.getLogger('train')
@@ -108,7 +108,7 @@ parser.add_argument('--gamma', default=0.95, type=float,
                     help='beta2 of optimizer (default: 0.95)')
 parser.add_argument('--warmup-epochs', default=5, type=int, metavar='N',
                     help='number of warmup epochs')
-parser.add_argument('--log-wandb', action='store_true', default=False,
+parser.add_argument('--log-wandb', default=False, type=bool,
                     help='log training and validation metrics to wandb')
 parser.add_argument('--wandb-entity', default=None,
                     help='user or team name of wandb')
@@ -218,25 +218,25 @@ def main_worker(gpu, ngpus_per_node, args):
             # DistributedDataParallel will divide and allocate batch_size to all
             # available GPUs if device_ids are not set
             model = torch.nn.parallel.DistributedDataParallel(model)
+        model_without_ddp = model.module
     elif args.gpu is not None:
+        model_without_ddp = model
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
-        # comment out the following line for debugging
-        # raise NotImplementedError("Only DistributedDataParallel is supported.")
     else:
-        # AllGather/rank implementation in this code only supports DistributedDataParallel.
         raise NotImplementedError("Only DistributedDataParallel is supported.")
 
     print(model)  # print model after SyncBatchNorm
 
-    if args.optimizer == 'lars':
-        optimizer = utils.LARS(model.parameters(), args.lr,
-                               weight_decay=args.weight_decay,
-                               momentum=args.momentum)
-    elif args.optimizer == 'adamw':
-        optimizer = torch.optim.AdamW(model.parameters(), args.lr,
-                                      betas=(0.9, args.gamma),
-                                      weight_decay=args.weight_decay)
+    # if args.optimizer == 'lars':
+    #     optimizer = utils.LARS(model.parameters(), args.lr,
+    #                            weight_decay=args.weight_decay,
+    #                            momentum=args.momentum)
+    # elif args.optimizer == 'adamw':
+    #     optimizer = torch.optim.AdamW(model.parameters(), args.lr,
+    #                                   betas=(0.9, args.gamma),
+    #                                   weight_decay=args.weight_decay)
+    optimizer = create_optimizer(args, model_without_ddp)
 
     scaler = torch.cuda.amp.GradScaler()
     summary_writer = SummaryWriter() if args.rank == 0 else None
