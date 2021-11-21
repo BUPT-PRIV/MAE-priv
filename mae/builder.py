@@ -1,13 +1,14 @@
 import math
+from functools import partial, reduce
+from operator import mul
+
 import torch
-from torch.functional import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
-from functools import partial
 
-from .vision_transformer import Block
 from .mix_mae import Mix_MAE
 from .pyramid_reconstruction_image_transformer import PriTEncoder, _init_vit_weights
+from .vision_transformer import Block
 
 
 class MAE(nn.Module):
@@ -27,17 +28,16 @@ class MAE(nn.Module):
         self.encoder = encoder()
         self.num_patches = self.encoder.num_patches
         self.patch_size = self.encoder.patch_size
-        self.visible_size = self.encoder.visible_size
-        self.use_mean_pooling = self.encoder.use_mean_pooling
+        self.num_visible = self.encoder.num_visible
 
-        # build dim_proj
+        # build encoder_linear_proj
         # Bx(14*14*0.75)x512 = Bx147x512
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
-        self.dim_proj = nn.Linear(self.encoder.embed_dim, decoder_dim)
+        self.encoder_linear_proj = nn.Linear(self.encoder.embed_dim, decoder_dim)
         self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(embed_dim=decoder_dim, decode=True)
 
         # build decoder
-        self.decoder = self._build_decoder(
+        self.decoder_blocks = self._build_decoder(
             decoder_dim=decoder_dim, decoder_head=decoder_dim // 64, decoder_depth=decoder_depth
         )
         self.decoder_norm = nn.LayerNorm(decoder_dim, eps=1e-6)
@@ -51,7 +51,7 @@ class MAE(nn.Module):
             self.mix_up = Mix_MAE(mode=mix_mode, alpha=mix_alpha)
 
         # weight initialization
-        for name, m in self.decoder.named_modules():
+        for name, m in self.decoder_blocks.named_modules():
             if isinstance(m, nn.Linear):
                 if 'qkv' in name:
                     # treat the weights of Q, K, V separately
@@ -70,11 +70,23 @@ class MAE(nn.Module):
         ]
         return nn.Sequential(*blocks)
 
-    def _mse_loss(self, x, y, masked_index=None):
-        if masked_index is not None:
-            return F.mse_loss(x[:, masked_index, :], y[:, masked_index, :], reduction="mean")
-        else:
-            return F.mse_loss(x, y, reduction="mean")
+    def get_target(self, img, masked_inds=None) -> torch.Tensor:
+        B, C, H, W = img.shape
+        S = self.patch_size[0]
+        target = img.view(B, C, H // S, S, W // S, S)
+        target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1, C)  # Bx49x(32*32)*C
+
+        if masked_inds is not None:
+            target = target[:, masked_inds]  # Bx37x(32*32)*C
+
+        # patch normalize
+        if self.normalized_pixel:
+            mean = target.mean(dim=-2, keepdim=True)
+            std = target.var(dim=-2, unbiased=True, keepdim=True).sqrt()
+            target = (target - mean) / (std + 1e-6)
+
+        target = target.flatten(2)  # Bx37x(32*32*C)
+        return target
 
     def forward(self, x):
         if self.mix_up is not None:
@@ -82,35 +94,31 @@ class MAE(nn.Module):
         else:
             target = x
 
-        # encode visible token
-        B, C, H, W = target.size()  # B, 3, 224, 224
+        # encode visible patches
         encoded_visible_patches, shuffle = self.encoder(x)
+        encoded_visible_patches = self.encoder_linear_proj(encoded_visible_patches)  # Bx49x768 --> Bx49x512
 
-        # un-shuffle  with positional embedding
-        encoded_visible_patches = self.dim_proj(encoded_visible_patches)  # Bx49x768 --> Bx49x512
-        decoder_input = torch.cat(
-            [encoded_visible_patches, self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])], dim=1
-        )[:, shuffle.sort()[1], :]  # Bx49x512 + Bx147x512 --> Bx196x512
+        # un-shuffle
+        mask_token = self.mask_token.repeat(x.size(0), self.num_patches - self.num_visible, 1)
+        decoder_input = torch.cat((encoded_visible_patches, mask_token), dim=1)
+        decoder_input = decoder_input[:, shuffle.argsort()]  # Bx49x512 + Bx147x512 --> Bx196x512
+
+        # with positional embedding
         decoder_input = decoder_input + self.decoder_pos_embed
 
-        # decode (encoded_visible_patches + mask_token)
-        decoder_output = self.decoder(decoder_input)  # Bx(14*14)x512
+        # decode all tokens
+        decoder_output = self.decoder_blocks(decoder_input)  # Bx(14*14)x512
         decoder_output = self.decoder_norm(decoder_output)
         decoder_output = self.decoder_linear_proj(decoder_output)  # Bx(14*14)x512 --> Bx(14*14)x(16*16*3)
 
         # target
-        target = target.view(
-            [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[1]]
-        )  # Bx3x224x224 --> Bx3x16x14x16x14
-        # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
-        target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1, C)
-        if self.normalized_pixel:
-            mean = target.mean(dim=-2, keepdim=True)
-            std = target.var(dim=-2, unbiased=True, keepdim=True).sqrt()
-            target = (target - mean) / (std + 1e-6)
-        target = target.view(B, self.num_patches, -1)
+        target = self.get_target(target)  # Bx(14*14)x(16*16*3)
 
-        return self._mse_loss(decoder_output, target, masked_index=shuffle[self.visible_size:])
+        masked_inds = shuffle[self.num_visible:]
+        return self.loss(decoder_output[:, masked_inds], target[:, masked_inds])
+
+    def loss(self, x, y):
+        return F.mse_loss(x, y)
 
 
 class PriT(nn.Module):
@@ -118,21 +126,23 @@ class PriT(nn.Module):
     Build a PyramidReconstructionImageTransformer (PriT) model with a encoder and encoder
     """
 
+    stage_idx = 4
+
     def __init__(self, encoder, decoder_dim=512, decoder_depth=8,
                  normalized_pixel=False, pyramid_reconstruction=False):
         super().__init__()
-        self.encoder: PriTEncoder = encoder()
         self.normalized_pixel = normalized_pixel
         self.pyramid_reconstruction = pyramid_reconstruction
         if pyramid_reconstruction:
             raise NotImplementedError
 
-        stride = self.encoder.stride
-        out_size = self.encoder.out_size
-        norm_layer = self.encoder.norm_layer
-        num_features = self.encoder.num_features
+        # build encoder
+        self.encoder: PriTEncoder = encoder()
+        stride = self.encoder.patch_size * reduce(mul, self.encoder.strides[:self.stage_idx])  # 32
+        img_size = self.encoder.img_size  # 224
+        out_size = (img_size[0] // stride, img_size[1] // stride)  # 7
+        num_features = self.encoder.dims[self.stage_idx - 1]
         num_heads = decoder_dim // (num_features // self.encoder.num_heads)
-        self.stride = self.encoder.stride
         self.num_patches = self.encoder.num_patches
         self.num_visible = self.encoder.num_visible
 
@@ -142,7 +152,7 @@ class PriT(nn.Module):
         # build decoder
         self.mask_token = nn.Parameter(torch.zeros(1, 1, 1, decoder_dim))
         self.decoder_blocks = self.encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
-        self.decoder_norm = norm_layer(decoder_dim, eps=1e-6)
+        self.decoder_norm = self.encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
         # pos_embed
@@ -171,10 +181,14 @@ class PriT(nn.Module):
     def init_weights(self):
         self.apply(_init_vit_weights)
 
-    def get_target(self, img) -> torch.Tensor:
+    def get_target(self, img, masked_inds=None) -> torch.Tensor:
         B, C, H, W = img.shape
-        target = img.view(B, C, H // self.stride, self.stride, W // self.stride, self.stride)
+        S = self.encoder.stride
+        target = img.view(B, C, H // S, S, W // S, S)
         target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1, C)  # Bx49x(32*32)*C
+
+        if masked_inds is not None:
+            target = target[:, masked_inds]  # Bx37x(32*32)*C
 
         # patch normalize
         if self.normalized_pixel:
@@ -182,12 +196,17 @@ class PriT(nn.Module):
             std = target.std(dim=-2, keepdim=True)
             target = (target - mean) / (std + 1e-6)
 
-        target = target.flatten(2)  # Bx49x(32*32*3)
+        target = target.flatten(2)  # Bx37x(32*32*C)
         return target
 
     def forward(self, x):
         # encode visible patches
-        encoded_visible_patches, shuffle = self.encoder(x)  # Bx12xL
+        encoded_visible_patches_multi_stages, shuffle = self.encoder(x)  # Bx12xL
+        if not self.pyramid_reconstruction:
+            encoded_visible_patches = encoded_visible_patches_multi_stages[-1]
+        else:
+            raise NotImplementedError
+
         encoded_visible_patches = self.encoder_linear_proj(encoded_visible_patches)  # Bx12x decoder_dim
         B, VG, L = encoded_visible_patches.shape
         encoded_visible_patches = encoded_visible_patches.reshape(B, self.num_visible, -1, L)  # Bx12xGx decoder_dim
@@ -213,8 +232,7 @@ class PriT(nn.Module):
         decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # Bx(37xG)x(32*32*3)
 
         # generate target
-        target = self.get_target(x)  # Bx49x(32*32*3)
-        masked_target = target[:, masked_inds] if num_masked > 0 else target
+        masked_target = self.get_target(x, masked_inds)  # Bx37x(32*32*3)
 
         return self.loss(decoded_masked_tokens, masked_target)
 
