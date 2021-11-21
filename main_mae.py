@@ -296,6 +296,7 @@ def main_worker(gpu, ngpus_per_node, args):
             os.makedirs('output')
         if not os.path.exists(ckpt):
             os.makedirs(ckpt)
+        print(f'=> save dir: {ckpt}')
 
     train_start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
@@ -373,7 +374,9 @@ def train(train_loader, model, optimizer, scaler, summary_writer, epoch, args):
         progress.wandb_log(i)
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    print(f'=> saving checkpint: {filename}')
     torch.save(state, filename)
+    print('=> save succesfully!')
     if is_best:
         shutil.copyfile(filename, 'model_best.pth.tar')
 
