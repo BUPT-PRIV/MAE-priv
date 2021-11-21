@@ -5,10 +5,55 @@ from operator import mul
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.modules.utils import _pair
 
-from timm.models.vision_transformer import (Block, PatchEmbed,
-    VisionTransformer, named_apply, trunc_normal_, _init_vit_weights)
-from timm.models.layers import to_2tuple
+from .layers import DropPath, PatchEmbed, Mlp
+
+
+class Attention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x):
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)  # make torchscript happy (cannot use tensor as tuple)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+
+class Block(nn.Module):
+
+    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.norm1 = norm_layer(dim)
+        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
+        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.norm2 = norm_layer(dim)
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+
+    def forward(self, x):
+        x = x + self.drop_path(self.attn(self.norm1(x)))
+        x = x + self.drop_path(self.mlp(self.norm2(x)))
+        return x
 
 
 class PatchDownsample(nn.Module):
@@ -82,30 +127,50 @@ class PatchUpsample(nn.Module):
         return x
 
 
-class PriTEncoder(VisionTransformer):
+class PriTEncoder(nn.Module):
     """
     PyramidReconstructionImageTransformer Encoder
     """
 
     def __init__(self,
-                 # args for ViT, w/o `distilled`, `detph` and `representation_size`.
-                 # default value of `patch_size`, `num_classes` and `embed_dim` changed.
-                 img_size=224, patch_size=4, in_chans=3, num_classes=0, embed_dim=96, num_heads=12,
+                 # args for ViT, w/o `num_classes`, `distilled`, `detph` and `representation_size`.
+                 # default value of `patch_size` and `embed_dim` changed.
+                 img_size=224, patch_size=4, in_chans=3, embed_dim=96, num_heads=12,
                  mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
                  embed_layer=PatchEmbed, norm_layer=None, act_layer=None, weight_init='',
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
                  mask_ratio=0.75, use_mean_pooling=True, pyramid_reconstruction=False):
-        # super(PriTEncoder, self).__init__()
-        super(VisionTransformer, self).__init__()
+        """
+        Args:
+            img_size (int, tuple): input image size
+            patch_size (int): patch size
+            in_chans (int): number of input channels
+            embed_dim (int): embedding dimension
+            num_heads (int): number of attention heads
+            mlp_ratio (int): ratio of mlp hidden dim to embedding dim
+            qkv_bias (bool): enable bias for qkv if True
+            drop_rate (float): dropout rate
+            attn_drop_rate (float): attention dropout rate
+            drop_path_rate (float): stochastic depth rate
+            embed_layer (nn.Module): patch embedding layer
+            norm_layer: (nn.Module): normalization layer
+            weight_init: (str): weight init scheme
 
-        self.num_classes = num_classes
-        self.embed_dim = embed_dim  # num_features for consistency with other models
-        self.num_features = dims[-1]  # update
+            strides (tuple): stride for echo stage
+            depths (tuple): depth of transformer for echo stage
+            dims (tuple): dimension for echo stage
+            mask_ratio (float): mask ratio
+            use_mean_pooling (bool): enable mean pool
+            pyramid_reconstruction (bool): return pyramid features from stages
+        """
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_features = dims[-1]  # num_features for consistency with other models
         self.num_tokens = 0 if use_mean_pooling else 1
         norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
         act_layer = act_layer or nn.GELU
-        self.img_size = img_size = to_2tuple(img_size)
+        self.img_size = img_size = _pair(img_size)
 
         # save args for build blocks
         self.num_heads = num_heads
@@ -141,7 +206,9 @@ class PriTEncoder(VisionTransformer):
         grid_h, grid_w = self.patch_embed.grid_size
         assert out_size[0] * grid_size == grid_h and out_size[1] * grid_size == grid_w
 
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) if use_cls_token else None
+        if use_cls_token:
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            nn.init.trunc_normal_(self.cls_token, std=.02)
         self.pos_embed = self.build_2d_sincos_position_embedding(grid_h, grid_w, embed_dim)
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -155,25 +222,27 @@ class PriTEncoder(VisionTransformer):
             ))
         self.norm = norm_layer(self.num_features)
 
-        # Classifier head(s)
-        self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
-
-        # weight initialization, ViT (timm)
+        # weight initialization
         self.init_weights(weight_init)
 
+    def init_weights(self, mode='moco_v3'):
+        assert mode in {'moco_v3', 'timm'}
         # weight initialization, MOCO v3
         for name, m in self.named_modules():
             if isinstance(m, nn.Linear):
-                if 'qkv' in name:
-                    # treat the weights of Q, K, V separately
-                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
-                    nn.init.uniform_(m.weight, -val, val)
-                else:
-                    nn.init.xavier_uniform_(m.weight)
+                if mode == 'moco_v3':
+                    if 'qkv' in name:
+                        # treat the weights of Q, K, V separately
+                        val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                        nn.init.uniform_(m.weight, -val, val)
+                    else:
+                        nn.init.xavier_uniform_(m.weight)
+                elif mode == 'timm':
+                    nn.init.trunc_normal_(m.weight, std=.02)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-        if isinstance(self.patch_embed, PatchEmbed):
+        if mode == 'moco_v3' and isinstance(self.patch_embed, PatchEmbed):
             # xavier_uniform initialization
             val = math.sqrt(6. / float(3 * reduce(mul, self.patch_embed.patch_size, 1) + self.embed_dim))
             nn.init.uniform_(self.patch_embed.proj.weight, -val, val)
@@ -208,28 +277,9 @@ class PriTEncoder(VisionTransformer):
         pos_embed.requires_grad = False
         return pos_embed
 
-    def init_weights(self, mode=''):
-        assert mode in ('jax', 'jax_nlhb', 'nlhb', '')
-        head_bias = -math.log(self.num_classes) if 'nlhb' in mode else 0.
-        # trunc_normal_(self.pos_embed, std=.02)
-        if mode.startswith('jax'):
-            # leave cls token as zeros to match jax impl
-            named_apply(partial(_init_vit_weights, head_bias=head_bias, jax_impl=True), self)
-        else:
-            if self.cls_token is not None:
-                trunc_normal_(self.cls_token, std=.02)
-            self.apply(_init_vit_weights)
-
     @torch.jit.ignore
     def no_weight_decay(self):
         return {'pos_embed', 'cls_token'}
-
-    def get_classifier(self):
-        return self.head
-
-    def reset_classifier(self, num_classes, global_pool=''):
-        self.num_classes = num_classes
-        self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
     def grid_patches(self, x, split_shape):
         B, N, L = x.shape
@@ -247,7 +297,7 @@ class PriTEncoder(VisionTransformer):
             out.append(x)
         return out if self.pyramid_reconstruction else [x]
 
-    def forward_features(self, x):
+    def forward(self, x):
         x = self.patch_embed(x)  # Bx(56x56)xL
         if self.use_cls_token:
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
@@ -277,10 +327,6 @@ class PriTEncoder(VisionTransformer):
             encoded_visible_patches = [p[:, 1:] for p in encoded_visible_patches]
 
         return encoded_visible_patches, shuffle
-
-    def forward(self, x):
-        encoded_visible_patches, shuffle = self.forward_features(x)
-        return self.head(encoded_visible_patches), shuffle
 
 
 class PriTDecoder1(nn.Module):
