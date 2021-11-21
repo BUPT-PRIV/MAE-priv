@@ -295,9 +295,9 @@ def main_worker(gpu, ngpus_per_node, args):
                                      args.arch,
                                      datetime.now().strftime("%Y%m%d-%H%M%S"), ])
         if not os.path.exists('output'):
-            os.mkdir('output')
+            os.makedirs('output')
         if not os.path.exists(ckpt):
-            os.mkdir(ckpt)
+            os.makedirs(ckpt)
 
     train_start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
