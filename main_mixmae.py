@@ -100,6 +100,12 @@ parser.add_argument('--mae-norm-p', default=False, type=bool,
 parser.add_argument('--use-mean-pooling', default=False, type=bool,
                     help='use mean pooling (default: False)')
 
+# mix cfg:
+parser.add_argument('--mix-mode', default='pair', type=str,
+                    choices=['pair', 'batch'],)
+parser.add_argument('--mix-alpha', default='0.5', type=float,
+                    help='mix alpha')
+
 # other upgrades
 parser.add_argument('--optimizer', default='lars', type=str,
                     choices=['lars', 'adamw'],
@@ -195,10 +201,14 @@ def main_worker(gpu, ngpus_per_node, args):
     print("=> creating model '{}'".format(args.arch))
     model = mae.builder.MAE(
         partial(vits.__dict__[args.arch], mask_ratio=args.mae_mask_t, use_mean_pooling=args.use_mean_pooling),
-        decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p)
+        decoder_dim=args.mae_dim, decoder_depth=args.mae_depth, normalized_pixel=args.mae_norm_p,
+        mix_mode=args.mix_mode, mix_alpha=args.mix_alpha
+    )
 
     # infer learning rate before changing batch size
     args.lr = args.lr * args.batch_size / 256
+    if args.mix_mode == 'pair':
+        args.batch_size = args.batch_size * 2
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -307,7 +317,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                                                     and args.rank == 0):  # only the first GPU saves checkpoint
-            if epoch % args.save_freq == 0 or epoch == (args.epoch - 1):
+            if epoch % args.save_freq == 0:
                 save_checkpoint({
                     'epoch': epoch + 1,
                     'arch': args.arch,

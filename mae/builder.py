@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from functools import partial
 
 from .vision_transformer import Block
+from .mix_mae import Mix_MAE
 from .pyramid_reconstruction_image_transformer import PriTEncoder, _init_vit_weights
 
 
@@ -15,7 +16,8 @@ class MAE(nn.Module):
     https://arxiv.org/abs/2111.06377
     """
 
-    def __init__(self, encoder, image_size=224, decoder_dim=512, decoder_depth=8, normalized_pixel=False):
+    def __init__(self, encoder, image_size=224, decoder_dim=512, decoder_depth=8, normalized_pixel=False,
+                 mix_mode=None, mix_alpha=0.0):
         super(MAE, self).__init__()
 
         self.image_size = image_size
@@ -39,7 +41,14 @@ class MAE(nn.Module):
             decoder_dim=decoder_dim, decoder_head=decoder_dim // 64, decoder_depth=decoder_depth
         )
         self.decoder_norm = nn.LayerNorm(decoder_dim, eps=1e-6)
-        self.decoder_linear_proj = nn.Linear(decoder_dim, self.patch_size[0] * self.patch_size[1] * 3)
+
+        self.color_channel = 6 if mix_mode is not None else 3
+        self.decoder_linear_proj = nn.Linear(decoder_dim, self.patch_size[0] * self.patch_size[1] * self.color_channel)
+
+        # mix mae
+        self.mix_up = None
+        if mix_mode is not None:
+            self.mix_up = Mix_MAE(mode=mix_mode, alpha=mix_alpha)
 
         # weight initialization
         for name, m in self.decoder.named_modules():
@@ -68,8 +77,13 @@ class MAE(nn.Module):
             return F.mse_loss(x, y, reduction="mean")
 
     def forward(self, x):
+        if self.mix_up is not None:
+            x, target = self.mix_up(x)
+        else:
+            target = x
+
         # encode visible token
-        B, C, H, W = x.size()  # B, 3, 224, 224
+        B, C, H, W = target.size()  # B, 3, 224, 224
         encoded_visible_patches, shuffle = self.encoder(x)
 
         # un-shuffle  with positional embedding
@@ -85,7 +99,7 @@ class MAE(nn.Module):
         decoder_output = self.decoder_linear_proj(decoder_output)  # Bx(14*14)x512 --> Bx(14*14)x(16*16*3)
 
         # target
-        target = x.view(
+        target = target.view(
             [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[1]]
         )  # Bx3x224x224 --> Bx3x16x14x16x14
         # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
