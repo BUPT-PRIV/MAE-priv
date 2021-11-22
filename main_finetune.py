@@ -88,7 +88,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'multi node data parallel training')
 
 # * Random Erase params
-parser.add_argument('--re-prob', type=float, default=0.25, metavar='PCT',
+parser.add_argument('--re-prob', type=float, default=0.0, metavar='PCT',
                     help='Random erase prob (default: 0.25)')
 parser.add_argument('--re-mode', type=str, default='pixel',
                     help='Random erase mode (default: "pixel")')
