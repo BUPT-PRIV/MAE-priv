@@ -342,6 +342,7 @@ class PriTDecoder1(nn.Module):
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
         self.num_masked = encoder.num_masked  # 37
+        self.stride = stride
 
         # build encoder linear projection(s) and mask token(s)
         self.encoder_linear_proj = nn.Linear(num_features, decoder_dim)
@@ -409,6 +410,21 @@ class PriTDecoder1(nn.Module):
         return decoded_masked_tokens
 
 
+class Output(nn.Module):
+
+    def __init__(self, dim, num_heads, qkv_bias=False, drop=0., attn_drop=0.,
+                 drop_path=0., norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.norm1 = norm_layer(dim)
+        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
+        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+
+    def forward(self, x):
+        x = x + self.drop_path(self.attn(self.norm1(x)))
+        return x
+
+
 class PriTDecoder2(nn.Module):
     """
     PyramidReconstructionImageTransformer Decoder
@@ -418,22 +434,30 @@ class PriTDecoder2(nn.Module):
         super().__init__()
         stage_idx = 1
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 4 for stage1
         img_size = encoder.img_size  # 224
-        out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
+        out_size = (img_size[0] // stride, img_size[1] // stride)  # 56 for stage1
         num_features = encoder.dims[stage_idx - 1]
         num_heads = decoder_dim // (num_features // encoder.num_heads)
         self.num_layers = encoder.num_layers  # 4
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
         self.num_masked = encoder.num_masked  # 37
+        self.stride = stride
 
-        # build encoder linear projection(s), mask token(s) and upsampler(s)
-        for stage_idx, (dim, s) in enumerate(zip(encoder.dims, encoder.strides), 1):
+        # build encoder linear projection(s) and mask token(s)
+        for stage_idx, dim in enumerate(encoder.dims, 1):
             setattr(self, f'encoder_linear_proj{stage_idx}', nn.Linear(dim, decoder_dim))
             setattr(self, f'mask_token{stage_idx}', nn.Parameter(torch.zeros(1, 1, 1, decoder_dim)))
-            setattr(self, f'upsampler{stage_idx}', 
+
+        # build upsampler(s)
+        for stage_idx, s in enumerate(encoder.strides[1:], 1):
+            setattr(self, f'upsampler{stage_idx}',
                 nn.Identity() if s == 1 else PatchUpsample(self.num_patches, stride=s))
+
+        # build output attention(s)
+        for i in range(self.num_layers):
+            setattr(self, f'output{i + 1}', Output(decoder_dim, num_heads))
 
         # pos_embed
         grid_size = encoder.stride // stride
@@ -451,7 +475,7 @@ class PriTDecoder2(nn.Module):
         # weight initialization
         self.init_weights()
         for i in range(self.num_layers):
-            nn.init.trunc_normal_(getattr(f'mask_token{i + 1}'), std=.02)
+            nn.init.trunc_normal_(getattr(self, f'mask_token{i + 1}'), std=.02)
 
     def init_weights(self):
         # weight initialization, MOCO v3
@@ -481,7 +505,8 @@ class PriTDecoder2(nn.Module):
             S: stride
         """
 
-        upsampled = None
+        # FPN-like
+        out = None
         for i, x in enumerate(xs[::-1]):
             stage_idx = len(xs) - i
 
@@ -499,18 +524,15 @@ class PriTDecoder2(nn.Module):
             all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x G x D
             all_tokens = all_tokens.reshape(B, -1, L)  # B x (P*G) x D
 
-            if upsampled is not None:
+            if out is not None:
+                upsampled = getattr(self, f'upsampler{stage_idx}')(out)  # B x N x D
                 all_tokens = all_tokens + upsampled
 
-            # TODO add fpn-like Attention here
-
-            upsampled = getattr(self, f'upsampler{stage_idx}')(all_tokens)  # B x N x D
-
-        all_tokens = upsampled / len(xs)
+            out = getattr(self, f'output{stage_idx}')(all_tokens)
 
         # decode all tokens
         masked_inds = shuffle[self.num_visible:]
-        decoded_all_tokens = self.decoder_blocks(all_tokens)  # B x (P*G) x D
+        decoded_all_tokens = self.decoder_blocks(out)  # B x (P*G) x D
         decoded_all_tokens = decoded_all_tokens.view(B, self.num_patches, -1, L)  # B x P x G x D
         decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x G x D
         decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # B x (M*G) x D
