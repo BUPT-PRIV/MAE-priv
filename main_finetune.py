@@ -60,6 +60,8 @@ parser.add_argument('-b', '--batch-size', default=1024, type=int,
                          'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     metavar='LR', help='initial (base) learning rate', dest='lr')
+parser.add_argument('--min-lr', default=0.0, type=float,
+                    help='minimum learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--wd', '--weight-decay', default=0.05, type=float,
@@ -602,7 +604,7 @@ def adjust_learning_rate(optimizer, epoch, args):
     if epoch < args.warmup_epochs:
         lr = args.lr * epoch / args.warmup_epochs
     else:
-        lr = args.lr * 0.5 * (
+        lr = args.min_lr + (args.lr - args.min_lr) * 0.5 * (
                 1. + math.cos(math.pi * (epoch - args.warmup_epochs) / (args.epochs - args.warmup_epochs)))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr * param_group["lr_scale"]
