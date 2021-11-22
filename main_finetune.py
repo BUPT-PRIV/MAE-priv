@@ -330,13 +330,14 @@ def main_worker(gpu, ngpus_per_node, args):
     valdir = os.path.join(args.data, 'val')
     normalize = transforms.Normalize(mean=args.mean, std=args.std)
 
-
+    interpolation = 3  # "bicubic"
     trans = [
-        transforms.RandomResizedCrop(args.img_size),
+        transforms.RandomResizedCrop(args.img_size, interpolation=interpolation),
         transforms.RandomHorizontalFlip(),
         rand_augment_transform(args.aa, dict(
             translate_const=int(args.img_size * 0.45),
             img_mean=tuple([min(255, round(255 * x)) for x in args.mean]),
+            interpolation=interpolation,
         )),
         transforms.ToTensor(),
         normalize
