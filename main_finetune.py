@@ -23,7 +23,7 @@ import torchvision.transforms as transforms
 import yaml
 import mae.mae_ft_vision_transformer as vits
 from utils import rand_augment_transform, Mixup, ModelEma, LayerDecayValueAssigner, SoftTargetCrossEntropy, \
-    create_optimizer, setup_default_logging, CheckpointSaver
+    create_optimizer, setup_default_logging, CheckpointSaver, RandomErasing
 
 _logger = logging.getLogger('train')
 
@@ -86,6 +86,17 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
+
+# * Random Erase params
+parser.add_argument('--re-prob', type=float, default=0.25, metavar='PCT',
+                    help='Random erase prob (default: 0.25)')
+parser.add_argument('--re-mode', type=str, default='pixel',
+                    help='Random erase mode (default: "pixel")')
+parser.add_argument('--re-count', type=int, default=1,
+                    help='Random erase count (default: 1)')
+parser.add_argument('--re-split', action='store_true', default=False,
+                    help='Do not random erase first (clean) augmentation split')
+
 
 # additional configs:
 parser.add_argument('--pretrained', default='', type=str,
@@ -300,18 +311,21 @@ def main_worker(gpu, ngpus_per_node, args):
     valdir = os.path.join(args.data, 'val')
     normalize = transforms.Normalize(mean=args.mean, std=args.std)
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        transforms.Compose([
-            transforms.RandomResizedCrop(args.img_size),
-            transforms.RandomHorizontalFlip(),
-            rand_augment_transform(args.aa, dict(
-                translate_const=int(args.img_size * 0.45),
-                img_mean=tuple([min(255, round(255 * x)) for x in args.mean]),
-            )),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+
+    trans = [
+        transforms.RandomResizedCrop(args.img_size),
+        transforms.RandomHorizontalFlip(),
+        rand_augment_transform(args.aa, dict(
+            translate_const=int(args.img_size * 0.45),
+            img_mean=tuple([min(255, round(255 * x)) for x in args.mean]),
+        )),
+    ]
+    if args.re_prob > 0.0:
+        trans.append(RandomErasing(args.re_prob, mode=args.re_mode, max_count=args.re_count,
+                                   num_splits=args.re_num_splits, device='cpu'))
+    trans.extend([transforms.ToTensor(), normalize,])
+
+    train_dataset = datasets.ImageFolder(traindir, trans)
 
     if args.mixup > 0 or args.cutmix > 0.:
         mixup_args = dict(

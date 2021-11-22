@@ -7,6 +7,7 @@ from .layer_decay import LayerDecayValueAssigner
 from .optim_factory import create_optimizer
 from .log import setup_default_logging
 from .checkpoint_saver import CheckpointSaver
+from .random_erasing import RandomErasing
 # from .native_scaler import NativeScalerWithGradNormCount
 
 # --------------------------------------------------------
