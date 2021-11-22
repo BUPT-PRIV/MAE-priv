@@ -9,7 +9,7 @@ pretrained: 'output/train/mae_vit-b_wo-norm/last.pth.tar'
 arch: 'vit_base'
 
 
-aa: 'rand-m9-mstd0.5'
+aa: 'rand-m9-mstd0.5-inc1'
 img_size: 224
 mixup: 0.8
 cutmix: 1.0
