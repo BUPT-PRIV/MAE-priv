@@ -141,6 +141,10 @@ class PriT1(nn.Module):
         self.decoder = PriTDecoder1(
             self.encoder, decoder_dim=decoder_dim, decoder_depth=decoder_depth)
 
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return self.encoder.no_weight_decay() | self.decoder.no_weight_decay()
+
     def get_target(self, img, masked_inds=None) -> torch.Tensor:
         B, C, H, W = img.shape
         S = self.decoder.stride

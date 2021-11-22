@@ -338,6 +338,7 @@ class PriTDecoder1(nn.Module):
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
         num_features = encoder.dims[stage_idx - 1]
         num_heads = decoder_dim // (num_features // encoder.num_heads)
+        self.num_layers = encoder.num_layers  # 4
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
         self.num_masked = encoder.num_masked  # 37
@@ -371,6 +372,10 @@ class PriTDecoder1(nn.Module):
                     nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return {'decoder_pos_embed', 'mask_token'}
 
     def forward(self, x, shuffle):
         """
@@ -418,6 +423,7 @@ class PriTDecoder2(nn.Module):
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
         num_features = encoder.dims[stage_idx - 1]
         num_heads = decoder_dim // (num_features // encoder.num_heads)
+        self.num_layers = encoder.num_layers  # 4
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
         self.num_masked = encoder.num_masked  # 37
@@ -444,7 +450,7 @@ class PriTDecoder2(nn.Module):
 
         # weight initialization
         self.init_weights()
-        for i in range(encoder.num_layers):
+        for i in range(self.num_layers):
             nn.init.trunc_normal_(getattr(f'mask_token{i + 1}'), std=.02)
 
     def init_weights(self):
@@ -459,6 +465,10 @@ class PriTDecoder2(nn.Module):
                     nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return {'decoder_pos_embed'} | {f'mask_token{i + 1}' for i in range(self.num_layers)}
 
     def forward(self, xs, shuffle):
         """
