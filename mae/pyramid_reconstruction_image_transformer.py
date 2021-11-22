@@ -223,30 +223,25 @@ class PriTEncoder(nn.Module):
         self.norm = norm_layer(self.num_features)
 
         # weight initialization
-        self.init_weights(weight_init)
-
-    def init_weights(self, mode='moco_v3'):
-        assert mode in {'moco_v3', 'timm'}
-        # weight initialization, MOCO v3
-        for name, m in self.named_modules():
-            if isinstance(m, nn.Linear):
-                if mode == 'moco_v3':
-                    if 'qkv' in name:
-                        # treat the weights of Q, K, V separately
-                        val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
-                        nn.init.uniform_(m.weight, -val, val)
-                    else:
-                        nn.init.xavier_uniform_(m.weight)
-                elif mode == 'timm':
-                    nn.init.trunc_normal_(m.weight, std=.02)
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
-
-        if mode == 'moco_v3' and isinstance(self.patch_embed, PatchEmbed):
+        self.init_weights()
+        if weight_init == 'moco_v3' and isinstance(self.patch_embed, PatchEmbed):
             # xavier_uniform initialization
             val = math.sqrt(6. / float(3 * reduce(mul, self.patch_embed.patch_size, 1) + self.embed_dim))
             nn.init.uniform_(self.patch_embed.proj.weight, -val, val)
             nn.init.zeros_(self.patch_embed.proj.bias)
+
+    def init_weights(self):
+        # weight initialization, MOCO v3
+        for name, m in self.named_modules():
+            if isinstance(m, nn.Linear):
+                if 'qkv' in name:
+                    # treat the weights of Q, K, V separately
+                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                    nn.init.uniform_(m.weight, -val, val)
+                else:
+                    nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def _build_blocks(self, dim, num_heads, depth, dpr=None):
         dpr = dpr or ([0.] * depth)
@@ -334,7 +329,7 @@ class PriTDecoder1(nn.Module):
     PyramidReconstructionImageTransformer Decoder
     """
 
-    def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, weight_init='moco_v3'):
+    def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8):
         super().__init__()
         stage_idx = encoder.num_layers  # 4
 
@@ -361,22 +356,19 @@ class PriTDecoder1(nn.Module):
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
         # weight initialization
-        self.init_weights(weight_init)
+        self.init_weights()
+        nn.init.trunc_normal_(self.mask_token, std=.02)
 
-    def init_weights(self, mode='moco_v3'):
-        assert mode in {'moco_v3', 'timm'}
+    def init_weights(self):
         # weight initialization, MOCO v3
         for name, m in self.named_modules():
             if isinstance(m, nn.Linear):
-                if mode == 'moco_v3':
-                    if 'qkv' in name:
-                        # treat the weights of Q, K, V separately
-                        val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
-                        nn.init.uniform_(m.weight, -val, val)
-                    else:
-                        nn.init.xavier_uniform_(m.weight)
-                elif mode == 'timm':
-                    nn.init.trunc_normal_(m.weight, std=.02)
+                if 'qkv' in name:
+                    # treat the weights of Q, K, V separately
+                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                    nn.init.uniform_(m.weight, -val, val)
+                else:
+                    nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
@@ -417,7 +409,7 @@ class PriTDecoder2(nn.Module):
     PyramidReconstructionImageTransformer Decoder
     """
 
-    def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, weight_init='moco_v3'):
+    def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8):
         super().__init__()
         stage_idx = 1
 
@@ -451,22 +443,20 @@ class PriTDecoder2(nn.Module):
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
         # weight initialization
-        self.init_weights(weight_init)
+        self.init_weights()
+        for i in range(encoder.num_layers):
+            nn.init.trunc_normal_(getattr(f'mask_token{i + 1}'), std=.02)
 
-    def init_weights(self, mode='moco_v3'):
-        assert mode in {'moco_v3', 'timm'}
+    def init_weights(self):
         # weight initialization, MOCO v3
         for name, m in self.named_modules():
             if isinstance(m, nn.Linear):
-                if mode == 'moco_v3':
-                    if 'qkv' in name:
-                        # treat the weights of Q, K, V separately
-                        val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
-                        nn.init.uniform_(m.weight, -val, val)
-                    else:
-                        nn.init.xavier_uniform_(m.weight)
-                elif mode == 'timm':
-                    nn.init.trunc_normal_(m.weight, std=.02)
+                if 'qkv' in name:
+                    # treat the weights of Q, K, V separately
+                    val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                    nn.init.uniform_(m.weight, -val, val)
+                else:
+                    nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 

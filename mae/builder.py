@@ -50,6 +50,7 @@ class MAE(nn.Module):
             self.mix_up = Mix_MAE(mode=mix_mode, alpha=mix_alpha)
 
         # weight initialization
+        nn.init.trunc_normal_(self.mask_token, std=.02)
         for name, m in self.decoder_blocks.named_modules():
             if isinstance(m, nn.Linear):
                 if 'qkv' in name:
