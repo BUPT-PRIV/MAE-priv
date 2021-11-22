@@ -25,6 +25,8 @@ import mae.mae_ft_vision_transformer as vits
 from utils import rand_augment_transform, Mixup, ModelEma, LayerDecayValueAssigner, SoftTargetCrossEntropy, \
     create_optimizer, setup_default_logging, CheckpointSaver, RandomErasing
 
+from timm.models import create_model
+
 _logger = logging.getLogger('train')
 
 torchvision_model_names = sorted(name for name in torchvision_models.__dict__
@@ -212,7 +214,20 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     if args.arch.startswith('vit'):
-        model = vits.__dict__[args.arch](drop_path_rate=args.drop_path, use_mean_pooling=args.use_mean_pooling)
+        print('True')
+        from modeling_finetune import vit_base_patch16_224
+        model = vit_base_patch16_224(
+            # 'vit_base_patch16_224',
+            pretrained=False,
+            num_classes=1000,
+            drop_rate=0.0,
+            drop_path_rate=0.1,
+            attn_drop_rate=0.0,
+            # drop_block_rate=None,
+            use_mean_pooling=False,
+            init_scale=0.0,
+        )
+        # model = vits.__dict__[args.arch](drop_path_rate=args.drop_path, use_mean_pooling=args.use_mean_pooling)
         linear_keyword = 'head'
     else:
         model = torchvision_models.__dict__[args.arch]()
@@ -236,6 +251,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 if k.startswith('module.encoder') and not k.startswith('module.encoder.%s' % linear_keyword):
                     # remove prefix
                     state_dict[k[len("module.encoder."):]] = state_dict[k]
+                elif k.startswith('backbone.'):
+                    state_dict[k[9:]] = state_dict[k]
+                elif k.startswith('encoder.'):
+                    state_dict[k[8:]] = state_dict[k]
                 if "pos_embed" in k:
                     del state_dict[k]
 
@@ -262,7 +281,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # ourselves based on the total number of GPUs we have
             args.batch_size = int(args.batch_size / args.world_size)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         else:
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
@@ -319,13 +338,14 @@ def main_worker(gpu, ngpus_per_node, args):
             translate_const=int(args.img_size * 0.45),
             img_mean=tuple([min(255, round(255 * x)) for x in args.mean]),
         )),
+        transforms.ToTensor(),
+        normalize
     ]
     if args.re_prob > 0.0:
         trans.append(RandomErasing(args.re_prob, mode=args.re_mode, max_count=args.re_count,
-                                   num_splits=args.re_num_splits, device='cpu'))
-    trans.extend([transforms.ToTensor(), normalize,])
+                                   num_splits=args.re_split, device='cpu'))
 
-    train_dataset = datasets.ImageFolder(traindir, trans)
+    train_dataset = datasets.ImageFolder(traindir, transforms.Compose(trans))
 
     if args.mixup > 0 or args.cutmix > 0.:
         mixup_args = dict(
