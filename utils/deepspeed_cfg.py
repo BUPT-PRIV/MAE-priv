@@ -1,7 +1,7 @@
 import json
 import os
 
-from utils import get_world_size
+from .dist import get_world_size
 
 
 def create_ds_config(args):
