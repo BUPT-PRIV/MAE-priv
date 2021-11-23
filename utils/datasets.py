@@ -30,12 +30,13 @@ class DataAugmentationForMAE(object):
                 std=torch.tensor(std))
         ])
 
-        self.masked_position_generator = RandomMaskingGenerator(
-            args.window_size, args.mask_ratio
-        )
+        # self.masked_position_generator = RandomMaskingGenerator(
+        #     args.window_size, args.mask_ratio
+        # )
 
     def __call__(self, image):
-        return self.transform(image), self.masked_position_generator()
+        # return self.transform(image), self.masked_position_generator()
+        return self.transform(image)
 
     def __repr__(self):
         repr = "(DataAugmentationForBEiT,\n"

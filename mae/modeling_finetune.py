@@ -165,7 +165,7 @@ class PatchEmbed(nn.Module):
 
 # sin-cos position encoding
 # https://github.com/jadore801120/attention-is-all-you-need-pytorch/blob/master/transformer/Models.py#L31
-def get_sinusoid_encoding_table(n_position, d_hid):
+def get_sinusoid_encoding_table(n_position, d_hid, token=False):
     ''' Sinusoid position encoding table '''
 
     # TODO: make it with torch instead of numpy 
@@ -175,6 +175,9 @@ def get_sinusoid_encoding_table(n_position, d_hid):
     sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
     sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
     sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
+
+    if token:
+        sinusoid_table = np.concatenate([sinusoid_table, np.zeros([1, d_hid])], dim=0)
 
     return torch.FloatTensor(sinusoid_table).unsqueeze(0)
 
