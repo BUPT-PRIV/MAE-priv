@@ -16,4 +16,4 @@ OMP_NUM_THREADS=1 python -m torch.distributed.launch --nproc_per_node=8 run_mae_
         --epochs 100 \
         --output_dir ${OUTPUT_DIR} \
         --log-wandb \
-        --wandb-experiment 'mae-pytorch'
+        --wandb-project 'mae-pytorch'

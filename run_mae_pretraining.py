@@ -94,7 +94,7 @@ def get_args():
                         help='path where to save, empty for no saving')
     parser.add_argument('--log-wandb', action='store_true', default=False,
                         help='log training and validation metrics to wandb')
-    parser.add_argument('--wandb-experiment', default=None, type=str,
+    parser.add_argument('--wandb-project', default=None, type=str,
                         help='log training and validation metrics to wandb')
     parser.add_argument('--wandb-entity', default=None, type=str,
                         help='user or team name of wandb')
