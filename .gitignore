@@ -7,3 +7,6 @@ checkpoints/
 **/.ipynb_checkpoints/**
 run.sh
 output/
+wandb/
+runs/
+.vscode/
