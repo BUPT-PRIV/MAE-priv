@@ -218,18 +218,18 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.arch.startswith('vit'):
         print('True')
         from modeling_finetune import vit_base_patch16_224
-        model = vit_base_patch16_224(
-            # 'vit_base_patch16_224',
-            pretrained=False,
-            num_classes=1000,
-            drop_rate=0.0,
-            drop_path_rate=0.1,
-            attn_drop_rate=0.0,
-            # drop_block_rate=None,
-            use_mean_pooling=False,
-            init_scale=0.0,
-        )
-        # model = vits.__dict__[args.arch](drop_path_rate=args.drop_path, use_mean_pooling=args.use_mean_pooling)
+        # model = vit_base_patch16_224(
+        #     # 'vit_base_patch16_224',
+        #     pretrained=False,
+        #     num_classes=1000,
+        #     drop_rate=0.0,
+        #     drop_path_rate=0.1,
+        #     attn_drop_rate=0.0,
+        #     # drop_block_rate=None,
+        #     use_mean_pooling=False,
+        #     init_scale=0.0,
+        # )
+        model = vits.__dict__[args.arch](drop_path_rate=args.drop_path, use_mean_pooling=args.use_mean_pooling)
         linear_keyword = 'head'
     else:
         model = torchvision_models.__dict__[args.arch]()
