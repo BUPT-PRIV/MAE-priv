@@ -204,21 +204,21 @@ class VisionTransformer(nn.Module):
                  init_values=0.,
                  use_learnable_pos_emb=False,
                  init_scale=0.,
-                 use_mean_pooling=True):
+                 use_mean_pooling=False):
         super().__init__()
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
 
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
-        num_patches = self.patch_embed.num_patches
+        self.num_patches = num_patches = self.patch_embed.num_patches
 
         # self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         if use_learnable_pos_emb:
             self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
         else:
             # sine-cosine positional embeddings is on the way
-            self.pos_embed = get_sinusoid_encoding_table(num_patches, embed_dim)
+            self.pos_embed = self.build_2d_sincos_position_embedding(embed_dim)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -242,6 +242,27 @@ class VisionTransformer(nn.Module):
 
         self.head.weight.data.mul_(init_scale)
         self.head.bias.data.mul_(init_scale)
+
+    def build_2d_sincos_position_embedding(self, embed_dim=768, temperature=10000.):
+        h, w = self.patch_embed.patch_shape
+        grid_w = torch.arange(w, dtype=torch.float32)
+        grid_h = torch.arange(h, dtype=torch.float32)
+        grid_w, grid_h = torch.meshgrid(grid_w, grid_h)
+        assert embed_dim % 4 == 0, 'Embed dimension must be divisible by 4 for 2D sin-cos position embedding'
+        pos_dim = embed_dim // 4
+        omega = torch.arange(pos_dim, dtype=torch.float32) / pos_dim
+        omega = 1. / (temperature ** omega)
+        out_w = torch.einsum('m,d->md', [grid_w.flatten(), omega])
+        out_h = torch.einsum('m,d->md', [grid_h.flatten(), omega])
+        pos_emb = torch.cat([torch.sin(out_w), torch.cos(out_w), torch.sin(out_h), torch.cos(out_h)], dim=1)[None, :, :]
+
+        if self.use_mean_pooling:
+            pos_embed = nn.Parameter(pos_emb)
+        else:
+            pe_token = torch.zeros([1, 1, embed_dim], dtype=torch.float32)
+            pos_embed = nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
+        pos_embed.requires_grad = False
+        return pos_embed
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):

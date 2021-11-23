@@ -133,9 +133,7 @@ def get_args():
     parser.add_argument('--model_key', default='model|module', type=str)
     parser.add_argument('--model_prefix', default='', type=str)
     parser.add_argument('--init_scale', default=0.001, type=float)
-    parser.add_argument('--use_mean_pooling', action='store_true')
-    parser.set_defaults(use_mean_pooling=True)
-    parser.add_argument('--use_cls', action='store_false', dest='use_mean_pooling')
+    parser.add_argument('--use_mean_pooling', default=False, type=bool)
 
     # Dataset parameters
     parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/', type=str,
@@ -186,6 +184,13 @@ def get_args():
                         help='url used to set up distributed training')
 
     parser.add_argument('--enable_deepspeed', action='store_true', default=False)
+
+    parser.add_argument('--log-wandb', action='store_true', default=False,
+                        help='log training and validation metrics to wandb')
+    parser.add_argument('--wandb-project', default=None, type=str,
+                        help='log training and validation metrics to wandb')
+    parser.add_argument('--wandb-entity', default=None, type=str,
+                        help='user or team name of wandb')
 
     known_args, _ = parser.parse_known_args()
 
@@ -248,9 +253,8 @@ def main(args, ds_init):
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
 
-    if global_rank == 0 and args.log_dir is not None:
-        os.makedirs(args.log_dir, exist_ok=True)
-        log_writer = utils.WandbLogger(log_dir=args.log_dir)
+    if global_rank == 0 and args.log_wandb:
+        log_writer = utils.WandbLogger(args)
     else:
         log_writer = None
 
@@ -480,12 +484,7 @@ def main(args, ds_init):
                     utils.save_model(
                         args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                         loss_scaler=loss_scaler, epoch="best", model_ema=model_ema)
-
             print(f'Max accuracy: {max_accuracy:.2f}%')
-            if log_writer is not None:
-                log_writer.update(test_acc1=test_stats['acc1'], head="perf", step=epoch)
-                log_writer.update(test_acc5=test_stats['acc5'], head="perf", step=epoch)
-                log_writer.update(test_loss=test_stats['loss'], head="perf", step=epoch)
 
             log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                          **{f'test_{k}': v for k, v in test_stats.items()},
@@ -496,10 +495,10 @@ def main(args, ds_init):
                          # **{f'test_{k}': v for k, v in test_stats.items()},
                          'epoch': epoch,
                          'n_parameters': n_parameters}
+        if log_writer is not None:
+            log_writer.update(log_stats)
 
         if args.output_dir and utils.is_main_process():
-            if log_writer is not None:
-                log_writer.flush()
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
 
@@ -622,14 +621,15 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         metric_logger.update(grad_norm=grad_norm)
 
         if log_writer is not None:
-            log_writer.update(loss=loss_value, head="loss")
-            log_writer.update(class_acc=class_acc, head="loss")
-            log_writer.update(loss_scale=loss_scale_value, head="opt")
-            log_writer.update(lr=max_lr, head="opt")
-            log_writer.update(min_lr=min_lr, head="opt")
-            log_writer.update(weight_decay=weight_decay_value, head="opt")
-            log_writer.update(grad_norm=grad_norm, head="opt")
-
+            log_writer.update(
+                {
+                    'loss': loss_value,
+                    'lr': max_lr,
+                    'weight_decay': weight_decay_value,
+                    'grad_norm': grad_norm,
+                    # 'class_acc': class_acc,
+                }
+            )
             log_writer.set_step()
 
     # gather the stats from all processes

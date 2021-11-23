@@ -243,7 +243,7 @@ def main(args):
             normlize_target=args.normlize_target,
         )
         if log_writer is not None:
-            log_writer.update(train_stats)
+            log_writer.update({**{k: v for k, v in train_stats.items()}, 'epoch': epoch})
         if args.output_dir:
             if (epoch + 1) % args.save_ckpt_freq == 0 or epoch + 1 == args.epochs:
                 utils.save_model(
