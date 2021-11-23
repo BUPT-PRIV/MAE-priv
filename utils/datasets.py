@@ -41,7 +41,7 @@ class DataAugmentationForMAE(object):
     def __repr__(self):
         repr = "(DataAugmentationForBEiT,\n"
         repr += "  transform = %s,\n" % str(self.transform)
-        repr += "  Masked position generator = %s,\n" % str(self.masked_position_generator)
+        # repr += "  Masked position generator = %s,\n" % str(self.masked_position_generator)
         repr += ")"
         return repr
 

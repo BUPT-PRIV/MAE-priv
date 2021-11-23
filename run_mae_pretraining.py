@@ -19,12 +19,9 @@ from typing import Iterable
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-import torch.nn as nn
-from einops import rearrange
 from utils import create_model
 
 import utils
-from utils import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from utils import NativeScalerWithGradNormCount as NativeScaler
 from utils.datasets import build_pretraining_dataset
 from utils.optim_factory import create_optimizer
@@ -95,8 +92,12 @@ def get_args():
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--log_dir', default=None,
-                        help='path where to tensorboard log')
+    parser.add_argument('--log-wandb', action='store_true', default=False,
+                        help='log training and validation metrics to wandb')
+    parser.add_argument('--wandb-experiment', default=None, type=str,
+                        help='log training and validation metrics to wandb')
+    parser.add_argument('--wandb-entity', default=None, type=str,
+                        help='user or team name of wandb')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=0, type=int)
@@ -173,9 +174,8 @@ def main(args):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
-    if global_rank == 0 and args.log_dir is not None:
-        os.makedirs(args.log_dir, exist_ok=True)
-        log_writer = utils.WandbLogger(log_dir=args.log_dir)
+    if global_rank == 0 and args.log_wandb:
+        log_writer = utils.WandbLogger(args)
     else:
         log_writer = None
 
@@ -242,6 +242,7 @@ def main(args):
             patch_size=patch_size[0],
             normlize_target=args.normlize_target,
         )
+        log_writer.update(train_stats)
         if args.output_dir:
             if (epoch + 1) % args.save_ckpt_freq == 0 or epoch + 1 == args.epochs:
                 utils.save_model(
@@ -252,8 +253,6 @@ def main(args):
                      'epoch': epoch, 'n_parameters': n_parameters}
 
         if args.output_dir and utils.is_main_process():
-            if log_writer is not None:
-                log_writer.flush()
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
 
@@ -273,9 +272,7 @@ def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, optimizer: to
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
 
-    loss_func = nn.MSELoss()
-
-    for step, (batch, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for step, (images, _) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # assign learning rate & weight decay for each step
         it = start_steps + step  # global training iteration
         if lr_schedule_values is not None or wd_schedule_values is not None:
@@ -285,34 +282,10 @@ def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, optimizer: to
                 if wd_schedule_values is not None and param_group["weight_decay"] > 0:
                     param_group["weight_decay"] = wd_schedule_values[it]
 
-        images, bool_masked_pos = batch
         images = images.to(device, non_blocking=True)
-        bool_masked_pos = bool_masked_pos.to(device, non_blocking=True).flatten(1).to(torch.bool)
-
-        # import pdb; pdb.set_trace()
-        with torch.no_grad():
-            # calculate the predict label
-            mean = torch.as_tensor(IMAGENET_DEFAULT_MEAN).to(device)[None, :, None, None]
-            std = torch.as_tensor(IMAGENET_DEFAULT_STD).to(device)[None, :, None, None]
-            unnorm_images = images * std + mean  # in [0, 1]
-
-            if normlize_target:
-                images_squeeze = rearrange(unnorm_images, 'b c (h p1) (w p2) -> b (h w) (p1 p2) c', p1=patch_size,
-                                           p2=patch_size)
-                images_norm = (images_squeeze - images_squeeze.mean(dim=-2, keepdim=True)
-                               ) / (images_squeeze.var(dim=-2, unbiased=True, keepdim=True).sqrt() + 1e-6)
-                # we find that the mean is about 0.48 and standard deviation is about 0.08.
-                images_patch = rearrange(images_norm, 'b n p c -> b n (p c)')
-            else:
-                images_patch = rearrange(unnorm_images, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size,
-                                         p2=patch_size)
-
-            B, _, C = images_patch.shape
-            labels = images_patch[bool_masked_pos].reshape(B, -1, C)
 
         with torch.cuda.amp.autocast():
-            outputs = model(images, bool_masked_pos)
-            loss = loss_func(input=outputs, target=labels)
+            loss = model(images)
 
         loss_value = loss.item()
 
@@ -347,13 +320,14 @@ def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, optimizer: to
         metric_logger.update(grad_norm=grad_norm)
 
         if log_writer is not None:
-            log_writer.update(loss=loss_value, head="loss")
-            log_writer.update(loss_scale=loss_scale_value, head="opt")
-            log_writer.update(lr=max_lr, head="opt")
-            log_writer.update(min_lr=min_lr, head="opt")
-            log_writer.update(weight_decay=weight_decay_value, head="opt")
-            log_writer.update(grad_norm=grad_norm, head="opt")
-
+            log_writer.update(
+                {
+                    'loss': loss_value,
+                    'lr': max_lr,
+                    'weight_decay': weight_decay_value,
+                    'grad_norm': grad_norm,
+                }
+            )
             log_writer.set_step()
 
         if lr_scheduler is not None:
@@ -361,7 +335,7 @@ def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, optimizer: to
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return {'[Epoch] ' + k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
 if __name__ == '__main__':

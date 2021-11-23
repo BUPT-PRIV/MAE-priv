@@ -74,7 +74,7 @@ class PretrainVisionTransformerEncoder(nn.Module):
         self.apply(self._init_weights)
 
     def build_2d_sincos_position_embedding(self, embed_dim=768, temperature=10000., decode=False):
-        h, w = self.patch_embed.grid_size
+        h, w = self.patch_embed.patch_shape
         grid_w = torch.arange(w, dtype=torch.float32)
         grid_h = torch.arange(h, dtype=torch.float32)
         grid_w, grid_h = torch.meshgrid(grid_w, grid_h)
@@ -118,7 +118,7 @@ class PretrainVisionTransformerEncoder(nn.Module):
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
             x = torch.cat((cls_token, x), dim=1)
 
-        x = self.pos_drop(x + self.pos_embed)
+        x = x + self.pos_embed
 
         if not self.use_mean_pooling:
             shuffle = torch.cat([torch.zeros(1, dtype=torch.long), shuffle + 1])
@@ -260,16 +260,16 @@ class PretrainVisionTransformer(nn.Module):
             init_values=init_values)
 
         self.num_patches = self.encoder.num_patches
-        self.patch_size = self.encoder.patch_size
+        self.patch_size = patch_size
         self.visible_size = self.encoder.visible_size
 
         self.encoder_to_decoder = nn.Linear(encoder_embed_dim, decoder_embed_dim, bias=False)
 
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
 
-        self.pos_embed = get_sinusoid_encoding_table(self.encoder.patch_embed.num_patches, decoder_embed_dim)
+        self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(decoder_embed_dim, decode=True)
 
-        self.normallized_pixel = normalized_pixel
+        self.normalized_pixel = normalized_pixel
 
         trunc_normal_(self.mask_token, std=.02)
 
@@ -312,7 +312,7 @@ class PretrainVisionTransformer(nn.Module):
 
         # target
         target = target.view(
-            [B, C, H // self.patch_size[0], self.patch_size[0], W // self.patch_size[1], self.patch_size[1]]
+            [B, C, H // self.patch_size, self.patch_size, W // self.patch_size, self.patch_size]
         )  # Bx3x224x224 --> Bx3x16x14x16x14
         # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
         target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1, C)

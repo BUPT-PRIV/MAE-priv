@@ -154,8 +154,12 @@ class MetricLogger(object):
 
 
 class WandbLogger(object):
-    def __init__(self, log_dir):
-        pass
+    def __init__(self, args, log_dir, entity):
+        wandb.init(
+            config=args,
+            entity=args.wandb_entity,
+            project=args.wandb_project,
+        )
 
     def set_step(self, step=None):
         if step is not None:
@@ -163,9 +167,9 @@ class WandbLogger(object):
         else:
             self.step += 1
 
-    def update(self, head='scalar', step=None, **kwargs):
+    def update(self, metrics):
         log_dict = dict()
-        for k, v in kwargs.items():
+        for k, v in metrics.items():
             if v is None:
                 continue
             if isinstance(v, torch.Tensor):
