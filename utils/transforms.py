@@ -1,18 +1,10 @@
-# --------------------------------------------------------
-# Based on BEiT, timm, DINO and DeiT code bases
-# https://github.com/microsoft/unilm/tree/master/beit
-# https://github.com/rwightman/pytorch-image-models/tree/master/timm
-# https://github.com/facebookresearch/deit
-# https://github.com/facebookresearch/dino
-# --------------------------------------------------------'
-import math
-import random
-import warnings
-
-import numpy as np
 import torch
 import torchvision.transforms.functional as F
 from PIL import Image
+import warnings
+import math
+import random
+import numpy as np
 
 
 class ToNumpy:
@@ -63,7 +55,7 @@ def _pil_interp(method):
 _RANDOM_INTERPOLATION = (Image.BILINEAR, Image.BICUBIC)
 
 
-class RandomResizedCropAndInterpolationWithTwoPic:
+class RandomResizedCropAndInterpolation:
     """Crop the given PIL Image to random size and aspect ratio with random interpolation.
 
     A crop of random size (default: of 0.08 to 1.0) of the original size and a random
@@ -78,19 +70,12 @@ class RandomResizedCropAndInterpolationWithTwoPic:
         interpolation: Default: PIL.Image.BILINEAR
     """
 
-    def __init__(self, size, second_size=None, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.),
-                 interpolation='bilinear', second_interpolation='lanczos'):
-        if isinstance(size, tuple):
-            self.size = size
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.),
+                 interpolation='bilinear'):
+        if isinstance(size, (list, tuple)):
+            self.size = tuple(size)
         else:
             self.size = (size, size)
-        if second_size is not None:
-            if isinstance(second_size, tuple):
-                self.second_size = second_size
-            else:
-                self.second_size = (second_size, second_size)
-        else:
-            self.second_size = None
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
             warnings.warn("range should be of kind (min, max)")
 
@@ -98,7 +83,6 @@ class RandomResizedCropAndInterpolationWithTwoPic:
             self.interpolation = _RANDOM_INTERPOLATION
         else:
             self.interpolation = _pil_interp(interpolation)
-        self.second_interpolation = _pil_interp(second_interpolation)
         self.scale = scale
         self.ratio = ratio
 
@@ -158,11 +142,7 @@ class RandomResizedCropAndInterpolationWithTwoPic:
             interpolation = random.choice(self.interpolation)
         else:
             interpolation = self.interpolation
-        if self.second_size is None:
-            return F.resized_crop(img, i, j, h, w, self.size, interpolation)
-        else:
-            return F.resized_crop(img, i, j, h, w, self.size, interpolation), \
-                   F.resized_crop(img, i, j, h, w, self.second_size, self.second_interpolation)
+        return F.resized_crop(img, i, j, h, w, self.size, interpolation)
 
     def __repr__(self):
         if isinstance(self.interpolation, (tuple, list)):
@@ -172,9 +152,5 @@ class RandomResizedCropAndInterpolationWithTwoPic:
         format_string = self.__class__.__name__ + '(size={0}'.format(self.size)
         format_string += ', scale={0}'.format(tuple(round(s, 4) for s in self.scale))
         format_string += ', ratio={0}'.format(tuple(round(r, 4) for r in self.ratio))
-        format_string += ', interpolation={0}'.format(interpolate_str)
-        if self.second_size is not None:
-            format_string += ', second_size={0}'.format(self.second_size)
-            format_string += ', second_interpolation={0}'.format(_pil_interpolation_to_str[self.second_interpolation])
-        format_string += ')'
+        format_string += ', interpolation={0})'.format(interpolate_str)
         return format_string

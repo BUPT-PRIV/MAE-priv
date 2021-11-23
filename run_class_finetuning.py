@@ -20,7 +20,7 @@ from typing import Iterable, Optional
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-from timm.models import create_model
+from utils import create_model
 
 import utils
 from utils import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy

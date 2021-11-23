@@ -8,7 +8,7 @@
 import os
 
 import torch
-from timm.data import create_transform
+from utils import create_transform
 from .data_constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
 from torchvision import datasets, transforms
 

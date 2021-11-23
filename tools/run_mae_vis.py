@@ -17,8 +17,8 @@ import torch
 import torch.backends.cudnn as cudnn
 from PIL import Image
 from einops import rearrange
-from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models import create_model
+from utils.data_constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+from utils import create_model
 from torchvision.transforms import ToPILImage
 
 from utils.datasets import DataAugmentationForMAE
