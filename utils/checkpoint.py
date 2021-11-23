@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 
 from .model import get_state_dict
-
+from .dist import save_on_master
 
 def _load_checkpoint_for_ema(model_ema, checkpoint):
     """

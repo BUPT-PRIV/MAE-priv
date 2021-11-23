@@ -243,14 +243,15 @@ def main(args):
             patch_size=patch_size[0],
             normlize_target=args.normlize_target,
         )
-        log_writer.update(train_stats)
+        if log_writer is not None:
+            log_writer.update(train_stats)
         if args.output_dir:
             if (epoch + 1) % args.save_ckpt_freq == 0 or epoch + 1 == args.epochs:
                 utils.save_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch)
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+        log_stats = {**{k: v for k, v in train_stats.items()},
                      'epoch': epoch, 'n_parameters': n_parameters}
 
         if args.output_dir and utils.is_main_process():
