@@ -117,3 +117,10 @@ by [this enthusiastic handsome guy](https://github.com/sunsmarterjie) with many 
 So if one can fininsh it, please feel free to report it in the issue or push a PR, thank you!
 
 And your star is my motivation, thank u~
+
+## Experiment
+
+|   model   |  pretrain   |  finetune  |     pe     | accuracy |
+| :-------: | :---------: | :--------: | :--------: | :------: |
+| vit-small | 100e (1024) | 50e (1024) | 2D sin-cos |          |
+
