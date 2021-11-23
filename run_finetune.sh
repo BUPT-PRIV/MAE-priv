@@ -1,7 +1,7 @@
 # Set the path to save checkpoints
 OUTPUT_DIR='output/'
 # path to imagenet-1k set
-DATA_PATH='/home/xingyan/Database/ILSVRC2017/Data/CLS-LO'
+DATA_PATH='/home/xingyan/Database/ILSVRC2017/Data/CLS-LOS'
 # path to pretrain model
 MODEL_PATH='MAE-pytorch_vitb.pth'
 

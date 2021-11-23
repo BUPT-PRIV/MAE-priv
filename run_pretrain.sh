@@ -1,7 +1,7 @@
 # Set the path to save checkpoints
 OUTPUT_DIR='output/pretrain_mae_base_patch16_224'
 # path to imagenet-1k train set
-DATA_PATH='/home/xingyan/Database/ILSVRC2017/Data/CLS-LO'
+DATA_PATH='/home/xingyan/Database/ILSVRC2017/Data/CLS-LOS'
 
 
 # batch_size can be adjusted according to the graphics card
