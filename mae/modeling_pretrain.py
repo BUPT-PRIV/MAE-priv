@@ -10,9 +10,9 @@ from functools import partial
 import torch
 import torch.nn as nn
 from timm.models.layers import trunc_normal_ as __call_trunc_normal_
-from timm.models.registry import register_model
+from utils.registry import register_model
 
-from modeling_finetune import Block, _cfg, PatchEmbed, get_sinusoid_encoding_table
+from .modeling_finetune import Block, _cfg, PatchEmbed, get_sinusoid_encoding_table
 
 
 def trunc_normal_(tensor, mean=0., std=1.):

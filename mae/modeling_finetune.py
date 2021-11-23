@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import drop_path, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
+from utils.registry import register_model
 
 
 def _cfg(url='', **kwargs):
