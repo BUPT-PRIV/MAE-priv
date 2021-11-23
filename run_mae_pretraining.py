@@ -132,6 +132,7 @@ def get_model(args):
         pretrained=False,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
+        normalized_pixel=args.normlize_target,
     )
 
     return model

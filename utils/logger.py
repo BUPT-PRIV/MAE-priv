@@ -1,7 +1,7 @@
 import datetime
 import time
 from collections import defaultdict, deque
-
+from .dist import is_dist_avail_and_initialized
 import torch
 import torch.distributed as dist
 import wandb
@@ -154,7 +154,7 @@ class MetricLogger(object):
 
 
 class WandbLogger(object):
-    def __init__(self, args, log_dir, entity):
+    def __init__(self, args):
         wandb.init(
             config=args,
             entity=args.wandb_entity,
