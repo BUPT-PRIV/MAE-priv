@@ -5,14 +5,13 @@
 # https://github.com/facebookresearch/deit
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
-from torchvision.datasets.vision import VisionDataset
-
-from PIL import Image
-
 import os
 import os.path
 import random
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
+
+from PIL import Image
+from torchvision.datasets.vision import VisionDataset
 
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
@@ -41,10 +40,10 @@ def is_image_file(filename: str) -> bool:
 
 
 def make_dataset(
-    directory: str,
-    class_to_idx: Dict[str, int],
-    extensions: Optional[Tuple[str, ...]] = None,
-    is_valid_file: Optional[Callable[[str], bool]] = None,
+        directory: str,
+        class_to_idx: Dict[str, int],
+        extensions: Optional[Tuple[str, ...]] = None,
+        is_valid_file: Optional[Callable[[str], bool]] = None,
 ) -> List[Tuple[str, int]]:
     instances = []
     directory = os.path.expanduser(directory)
@@ -92,7 +91,7 @@ class DatasetFolder(VisionDataset):
         target_transform (callable, optional): A function/transform that takes
             in the target and transforms it.
         is_valid_file (callable, optional): A function that takes path of a file
-            and check if the file is a valid file (used to check of corrupt files)
+            and check if the file is a valid file (used to check of corrupt logs)
             both extensions and is_valid_file should not be passed.
 
      Attributes:
@@ -116,7 +115,7 @@ class DatasetFolder(VisionDataset):
         classes, class_to_idx = self._find_classes(self.root)
         samples = make_dataset(self.root, class_to_idx, extensions, is_valid_file)
         if len(samples) == 0:
-            msg = "Found 0 files in subfolders of: {}\n".format(self.root)
+            msg = "Found 0 logs in subfolders of: {}\n".format(self.root)
             if extensions is not None:
                 msg += "Supported extensions are: {}".format(",".join(extensions))
             raise RuntimeError(msg)
@@ -222,7 +221,7 @@ class ImageFolder(DatasetFolder):
             target and transforms it.
         loader (callable, optional): A function to load an image given its path.
         is_valid_file (callable, optional): A function that takes path of an Image file
-            and check if the file is a valid file (used to check of corrupt files)
+            and check if the file is a valid file (used to check of corrupt logs)
 
      Attributes:
         classes (list): List of the class names sorted alphabetically.

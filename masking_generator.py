@@ -5,9 +5,8 @@
 # https://github.com/facebookresearch/deit
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
-import random
-import math
 import numpy as np
+
 
 class RandomMaskingGenerator:
     def __init__(self, input_size, mask_ratio):
@@ -31,4 +30,4 @@ class RandomMaskingGenerator:
             np.ones(self.num_mask),
         ])
         np.random.shuffle(mask)
-        return mask # [196]
+        return mask  # [196]

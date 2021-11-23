@@ -5,10 +5,9 @@
 # https://github.com/facebookresearch/deit
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
-import math
 from functools import partial
-import numpy as np
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -29,13 +28,14 @@ def _cfg(url='', **kwargs):
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
     """
+
     def __init__(self, drop_prob=None):
         super(DropPath, self).__init__()
         self.drop_prob = drop_prob
 
     def forward(self, x):
         return drop_path(x, self.drop_prob, self.training)
-    
+
     def extra_repr(self) -> str:
         return 'p={}'.format(self.drop_prob)
 
@@ -92,12 +92,11 @@ class Attention(nn.Module):
         # qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         qkv = F.linear(input=x, weight=self.qkv.weight, bias=qkv_bias)
         qkv = qkv.reshape(B, N, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[2]   # make torchscript happy (cannot use tensor as tuple)
+        q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
 
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
 
-        
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
 
@@ -124,8 +123,8 @@ class Block(nn.Module):
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
         if init_values > 0:
-            self.gamma_1 = nn.Parameter(init_values * torch.ones((dim)),requires_grad=True)
-            self.gamma_2 = nn.Parameter(init_values * torch.ones((dim)),requires_grad=True)
+            self.gamma_1 = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
+            self.gamma_2 = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
         else:
             self.gamma_1, self.gamma_2 = None, None
 
@@ -142,6 +141,7 @@ class Block(nn.Module):
 class PatchEmbed(nn.Module):
     """ Image to Patch Embedding
     """
+
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
         super().__init__()
         img_size = to_2tuple(img_size)
@@ -161,42 +161,45 @@ class PatchEmbed(nn.Module):
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
-    
+
+
 # sin-cos position encoding
 # https://github.com/jadore801120/attention-is-all-you-need-pytorch/blob/master/transformer/Models.py#L31
-def get_sinusoid_encoding_table(n_position, d_hid): 
-    ''' Sinusoid position encoding table ''' 
+def get_sinusoid_encoding_table(n_position, d_hid):
+    ''' Sinusoid position encoding table '''
+
     # TODO: make it with torch instead of numpy 
-    def get_position_angle_vec(position): 
-        return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)] 
+    def get_position_angle_vec(position):
+        return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
 
-    sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)]) 
-    sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2]) # dim 2i 
-    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2]) # dim 2i+1 
+    sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
+    sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
+    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
 
-    return torch.FloatTensor(sinusoid_table).unsqueeze(0) 
+    return torch.FloatTensor(sinusoid_table).unsqueeze(0)
 
 
 class VisionTransformer(nn.Module):
     """ Vision Transformer with support for patch or hybrid CNN input stage
     """
-    def __init__(self, 
-                 img_size=224, 
-                 patch_size=16, 
-                 in_chans=3, 
-                 num_classes=1000, 
-                 embed_dim=768, 
+
+    def __init__(self,
+                 img_size=224,
+                 patch_size=16,
+                 in_chans=3,
+                 num_classes=1000,
+                 embed_dim=768,
                  depth=12,
-                 num_heads=12, 
-                 mlp_ratio=4., 
-                 qkv_bias=False, 
-                 qk_scale=None, 
-                 drop_rate=0., 
+                 num_heads=12,
+                 mlp_ratio=4.,
+                 qkv_bias=False,
+                 qk_scale=None,
+                 drop_rate=0.,
                  attn_drop_rate=0.,
-                 drop_path_rate=0., 
-                 norm_layer=nn.LayerNorm, 
+                 drop_path_rate=0.,
+                 norm_layer=nn.LayerNorm,
                  init_values=0.,
-                 use_learnable_pos_emb=False, 
+                 use_learnable_pos_emb=False,
                  init_scale=0.,
                  use_mean_pooling=True):
         super().__init__()
@@ -215,7 +218,6 @@ class VisionTransformer(nn.Module):
             self.pos_embed = get_sinusoid_encoding_table(num_patches, embed_dim)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
-
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
         self.blocks = nn.ModuleList([
@@ -286,6 +288,7 @@ class VisionTransformer(nn.Module):
         x = self.head(x)
         return x
 
+
 @register_model
 def vit_small_patch16_224(pretrained=False, **kwargs):
     model = VisionTransformer(
@@ -293,6 +296,7 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     model.default_cfg = _cfg()
     return model
+
 
 @register_model
 def vit_base_patch16_224(pretrained=False, **kwargs):
