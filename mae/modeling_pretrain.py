@@ -220,6 +220,7 @@ class PretrainVisionTransformer(nn.Module):
                  use_learnable_pos_emb=False,
                  normalized_pixel=False,
                  mask_ratio=0.75,
+                 use_mean_pooling=False,
                  num_classes=0,  # avoid the error from create_fn in timm
                  ):
         super().__init__()
@@ -240,7 +241,8 @@ class PretrainVisionTransformer(nn.Module):
             norm_layer=norm_layer,
             init_values=init_values,
             use_learnable_pos_emb=use_learnable_pos_emb,
-            mask_ratio=mask_ratio
+            mask_ratio=mask_ratio,
+            use_mean_pooling=use_mean_pooling,
         )
 
         self.decoder = PretrainVisionTransformerDecoder(

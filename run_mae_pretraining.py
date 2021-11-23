@@ -37,18 +37,16 @@ def get_args():
     # Model parameters
     parser.add_argument('--model', default='pretrain_mae_base_patch16_224', type=str, metavar='MODEL',
                         help='Name of model to train')
-
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='ratio of the visual tokens/patches need be masked')
-
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size for backbone')
-
     parser.add_argument('--drop_path', type=float, default=0.0, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
-
     parser.add_argument('--normlize_target', default=True, type=bool,
                         help='normalized the target patch pixels')
+    parser.add_argument('--use_mean_pooling', default=False, type=bool,
+                        help='use mean pooling for classification. use cls-token if false.')
 
     # Optimizer parameters
     parser.add_argument('--opt', default='adamw', type=str, metavar='OPTIMIZER',
@@ -133,6 +131,7 @@ def get_model(args):
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
         normalized_pixel=args.normlize_target,
+        use_mean_pooling=args.use_mean_pooling
     )
 
     return model
