@@ -21,7 +21,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from einops import rearrange
-from timm.models import create_model
+from utils import create_model
 
 import utils
 from utils import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
@@ -29,6 +29,7 @@ from utils import NativeScalerWithGradNormCount as NativeScaler
 from utils.datasets import build_pretraining_dataset
 from utils.optim_factory import create_optimizer
 
+import mae.modeling_pretrain
 
 def get_args():
     parser = argparse.ArgumentParser('MAE pre-training script', add_help=False)

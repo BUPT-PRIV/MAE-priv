@@ -31,6 +31,7 @@ from utils import accuracy
 from utils.datasets import build_dataset
 from utils.optim_factory import create_optimizer, get_parameter_groups, LayerDecayValueAssigner
 
+import mae.modeling_finetune
 
 def get_args():
     parser = argparse.ArgumentParser('MAE fine-tuning and evaluation script for image classification', add_help=False)

@@ -19,3 +19,5 @@ from .model_ema import ModelEma, ModelEmaV2
 from .native_scaler import *
 from .optim_factory import create_optimizer
 from .transforms import *
+from .registry import register_model, model_entrypoint
+from .model_builder import create_model
