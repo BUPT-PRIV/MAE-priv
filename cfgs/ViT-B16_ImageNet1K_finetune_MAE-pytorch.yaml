@@ -7,7 +7,7 @@ pretrained: 'output/train/mae_vit-b_wo-norm/last.pth.tar'
 
 # Architecture
 arch: 'vit_base'
-
+use_mean_pooling: True
 
 aa: 'rand-m9-mstd0.5-inc1'
 img_size: 224
