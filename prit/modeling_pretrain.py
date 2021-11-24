@@ -6,223 +6,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair as to_2tuple
 
-from utils.layers import DropPath
 from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 
-
-__all__ = [
-    'pretrain_prit_mae_small_patch16_224',
-]
-
-
-def _cfg(url='', **kwargs):
-    return {
-        'url': url,
-        'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
-        'crop_pct': .9, 'interpolation': 'bicubic',
-        'mean': (0.5, 0.5, 0.5), 'std': (0.5, 0.5, 0.5),
-        **kwargs
-    }
+from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output
+from .utils import build_2d_sincos_position_embedding, _cfg
 
 
 def trunc_normal_(tensor, mean=0., std=1.):
     __call_trunc_normal_(tensor, mean=mean, std=std, a=-std, b=std)
-
-
-class Mlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-        self.fc1 = nn.Linear(in_features, hidden_features)
-        self.act = act_layer()
-        self.fc2 = nn.Linear(hidden_features, out_features)
-        self.drop = nn.Dropout(drop)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.act(x)
-        # x = self.drop(x)
-        # commit this for the orignal BERT implement 
-        x = self.fc2(x)
-        x = self.drop(x)
-        return x
-
-
-class Attention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None,
-                 attn_drop=0., proj_drop=0., attn_head_dim=None):
-        super().__init__()
-        self.num_heads = num_heads
-        head_dim = dim // num_heads
-        if attn_head_dim is not None:
-            head_dim = attn_head_dim
-        all_head_dim = head_dim * self.num_heads
-        self.scale = qk_scale or head_dim ** -0.5
-
-        self.qkv = nn.Linear(dim, all_head_dim * 3, bias=False)
-        if qkv_bias:
-            self.q_bias = nn.Parameter(torch.zeros(all_head_dim))
-            self.v_bias = nn.Parameter(torch.zeros(all_head_dim))
-        else:
-            self.q_bias = None
-            self.v_bias = None
-
-        self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(all_head_dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
-
-    def forward(self, x):
-        B, N, C = x.shape
-        qkv_bias = None
-        if self.q_bias is not None:
-            qkv_bias = torch.cat((self.q_bias, torch.zeros_like(self.v_bias, requires_grad=False), self.v_bias))
-        # qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        qkv = F.linear(input=x, weight=self.qkv.weight, bias=qkv_bias)
-        qkv = qkv.reshape(B, N, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
-
-        q = q * self.scale
-        attn = (q @ k.transpose(-2, -1))
-
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-
-        x = (attn @ v).transpose(1, 2).reshape(B, N, -1)
-        x = self.proj(x)
-        x = self.proj_drop(x)
-        return x
-
-
-class Block(nn.Module):
-
-    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None,
-                 drop=0., attn_drop=0., drop_path=0., init_values=None, act_layer=nn.GELU,
-                 norm_layer=nn.LayerNorm, attn_head_dim=None):
-        super().__init__()
-        self.norm1 = norm_layer(dim)
-        self.attn = Attention(
-            dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
-            attn_drop=attn_drop, proj_drop=drop, attn_head_dim=attn_head_dim)
-        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.norm2 = norm_layer(dim)
-        mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
-
-        if init_values > 0:
-            self.gamma_1 = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
-            self.gamma_2 = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
-        else:
-            self.gamma_1, self.gamma_2 = None, None
-
-    def forward(self, x):
-        if self.gamma_1 is None:
-            x = x + self.drop_path(self.attn(self.norm1(x)))
-            x = x + self.drop_path(self.mlp(self.norm2(x)))
-        else:
-            x = x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
-            x = x + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x)))
-        return x
-
-
-class PatchEmbed(nn.Module):
-    """ 2D Image to Patch Embedding
-    """
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, norm_layer=None, flatten=True):
-        super().__init__()
-        img_size = to_2tuple(img_size)
-        patch_size = to_2tuple(patch_size)
-        self.img_size = img_size
-        self.patch_size = patch_size
-        self.grid_size = (img_size[0] // patch_size[0], img_size[1] // patch_size[1])
-        self.num_patches = self.grid_size[0] * self.grid_size[1]
-        self.flatten = flatten
-
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-        torch._assert(H == self.img_size[0], f"Input image height ({H}) doesn't match model ({self.img_size[0]}).")
-        torch._assert(W == self.img_size[1], f"Input image width ({W}) doesn't match model ({self.img_size[1]}).")
-        x = self.proj(x)
-        if self.flatten:
-            x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
-        x = self.norm(x)
-        return x
-
-
-class PatchDownsample(nn.Module):
-    def __init__(self, dim_in, dim_out, num_visible, stride=2,
-                 norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cls_token=False):
-        super().__init__()
-
-        self.dim_in = dim_in
-        self.dim_out = dim_out
-        self.num_visible = num_visible
-        self.stride = stride
-        self.with_cls_token = with_cls_token
-
-        if stride == 1:
-            self.pool = None
-        elif stride == 2:
-            self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
-        else:
-            raise ValueError(stride)
-
-        self.reduction = nn.Linear(dim_in, dim_out, bias=False)
-        self.norm = norm_layer(dim_out)
-
-    def forward(self, x):
-        if self.pool is not None:
-            x_wo_cls_token = x[:, 1:] if self.with_cls_token else x
-
-            B, VG, L = x_wo_cls_token.shape  # 12, G=8*8, 4x4, 2x2, 1x1
-            Gh = Gw = int((VG // self.num_visible) ** 0.5)
-
-            # get grid-like patches
-            x_wo_cls_token = x_wo_cls_token.permute(0, 2, 1)  # BxLxVG
-            x_wo_cls_token = x_wo_cls_token.reshape(B, -1, Gh, Gw)  # Bx(L*V)xGhxGw
-
-            x_wo_cls_token = self.pool(x_wo_cls_token)  # Bx(LxV)x Gh/2 x Gw/2
-
-            # reshape
-            x_wo_cls_token = x_wo_cls_token.view(B, L, -1)  # BxLx(VG/4)
-            x_wo_cls_token = x_wo_cls_token.permute(0, 2, 1)  # Bx(VG/4)xL
-
-            x = torch.cat((x[:, [0]], x_wo_cls_token), dim=1) if self.with_cls_token else x_wo_cls_token
-
-        x = self.reduction(x)
-        x = self.norm(x)
-        return x
-
-
-class PatchUpsample(nn.Module):
-    def __init__(self, num_visible, stride=2):
-        super().__init__()
-
-        if stride != 2:
-            raise ValueError(stride)
-
-        self.num_visible = num_visible
-        self.stride = stride
-        self.upsampler = partial(F.interpolate, scale_factor=stride, mode='bilinear', align_corners=False)
-
-    def forward(self, x):
-        B, VG, L = x.shape
-        Gh = Gw = int((VG // self.num_visible) ** 0.5)
-
-        x = x.permute(0, 2, 1)
-        x = x.reshape(B, -1, Gh, Gw)
-        x = self.upsampler(x)
-
-        # reshape
-        x = x.view(B, L, -1)  # BxLx(Gh*2*Gw*2)
-        x = x.permute(0, 2, 1)
-
-        return x
 
 
 class PriTEncoder(nn.Module):
@@ -231,11 +23,14 @@ class PriTEncoder(nn.Module):
     """
 
     def __init__(self,
-                 # args for ViT, w/o `num_classes`, `distilled`, `detph`, `representation_size` and `weight_init`.
+                 # args for ViT (timm)
+                 # w/o `num_classes`, `distilled`, `detph`, `representation_size` and `weight_init`.
                  # default value of `patch_size` and `embed_dim` changed.
                  img_size=224, patch_size=4, in_chans=3, embed_dim=96, num_heads=12, mlp_ratio=4.,
-                 qkv_bias=True, qk_scale=None, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
-                 embed_layer=PatchEmbed, norm_layer=None, act_layer=None, init_values=0.,
+                 qkv_bias=True, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
+                 embed_layer=PatchEmbed, norm_layer=None, act_layer=None,
+                 # more args for ViT (BeiT)
+                 qk_scale=None, init_values=0.,
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
                  mask_ratio=0.75, use_mean_pooling=True, pyramid_reconstruction=False):
@@ -248,12 +43,13 @@ class PriTEncoder(nn.Module):
             num_heads (int): number of attention heads
             mlp_ratio (int): ratio of mlp hidden dim to embedding dim
             qkv_bias (bool): enable bias for qkv if True
-            qk_scale (float): scale of qk in Attention
             drop_rate (float): dropout rate
             attn_drop_rate (float): attention dropout rate
             drop_path_rate (float): stochastic depth rate
             embed_layer (nn.Module): patch embedding layer
             norm_layer (nn.Module): normalization layer
+
+            qk_scale (float): scale of qk in Attention
             init_values (float): init values of gamma_{1|2} in Block
 
             strides (tuple): stride for echo stage
@@ -311,7 +107,7 @@ class PriTEncoder(nn.Module):
             grid_h, grid_w, embed_dim, use_cls_token=use_cls_token)
         self.pos_drop = nn.Dropout(p=drop_rate)
 
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
+        dpr = [x.item() for x in torch.linspace(drop_path_rate, 0, sum(depths))]  # stochastic depth decay rule
         for i in range(self.num_layers):
             downsample = i > 0 and (strides[i] == 2 or dims[i - 1] != dims[i])
             self.add_module(f'stage{i + 1}', nn.Sequential(
@@ -374,11 +170,8 @@ class PriTEncoder(nn.Module):
         x_wo_cls_token = self.grid_patches(x_wo_cls_token, self.split_shape)  # Bx (7x7)x(8x8) xL
 
         # get visible tokens by random shuffle
-        if self.mask_ratio == 0.:
-            visible_tokens = x_wo_cls_token
-        else:
-            shuffle = torch.randperm(self.num_patches)  # 49 = 7 * 7
-            visible_tokens = x_wo_cls_token[:, shuffle[:self.num_visible]]    # Bx12x(8x8)xL
+        shuffle = torch.randperm(self.num_patches)  # 49 = 7 * 7
+        visible_tokens = x_wo_cls_token[:, shuffle[:self.num_visible]]    # Bx12x(8x8)xL
         visible_tokens = visible_tokens.flatten(1, 2)  # Bx(12x8x8)xL
 
         if self.use_cls_token:
@@ -457,7 +250,6 @@ class PriTDecoder1(nn.Module):
         encoded_visible_patches = self.encoder_linear_proj(x)  # B x V x D
 
         # un-shuffle
-        masked_inds = shuffle[self.num_visible:]
         mask_token = self.mask_token.expand(x.size(0), self.num_masked, -1)  # B x M x D
         all_tokens = torch.cat((encoded_visible_patches, mask_token), dim=1)  # B x P x D = B x (V + M) x D
         all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x D
@@ -466,27 +258,13 @@ class PriTDecoder1(nn.Module):
         all_tokens = all_tokens + self.decoder_pos_embed
 
         # decode all tokens
+        masked_inds = shuffle[self.num_visible:]
         decoded_all_tokens = self.decoder_blocks(all_tokens)  # B x P x D
         decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x D
         decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x M x D
         decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x M x 32*32*3
 
         return decoded_masked_tokens
-
-
-class Output(nn.Module):
-
-    def __init__(self, dim, num_heads, qkv_bias=False, drop=0., attn_drop=0.,
-                 drop_path=0., norm_layer=nn.LayerNorm):
-        super().__init__()
-        self.norm1 = norm_layer(dim)
-        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
-        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-
-    def forward(self, x):
-        x = x + self.drop_path(self.attn(self.norm1(x)))
-        return x
 
 
 class PriTDecoder2(nn.Module):
@@ -520,17 +298,17 @@ class PriTDecoder2(nn.Module):
             setattr(self, f'upsampler{stage_idx}',
                 nn.Identity() if s == 1 else PatchUpsample(self.num_patches, stride=s))
 
-        # build output attention(s)
-        for i in range(self.num_layers):
-            setattr(self, f'output{i + 1}', Output(decoder_dim, num_heads))
+        # build and pos embed(s) and output attention(s)
+        for stage_idx in range(1, self.num_layers + 1):
+            s = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])
+            pos_embed = self._build_pos_embed(img_size[0] // s, img_size[1] // s, decoder_dim,
+                grid_size=encoder.strides[stage_idx] if stage_idx < self.num_layers else 1)
+            setattr(self, f'pos_embed{stage_idx}', pos_embed)
+            setattr(self, f'output{stage_idx}', Output(decoder_dim, num_heads))
 
         # pos_embed
-        grid_size = encoder.stride // stride
-        split_shape = (out_size[0] // grid_size, grid_size, out_size[1] // grid_size, grid_size)
-        decoder_pos_embed = build_2d_sincos_position_embedding(
-            out_size[0], out_size[1], decoder_dim)
-        self.decoder_pos_embed = nn.Parameter(
-            encoder.grid_patches(decoder_pos_embed, split_shape), requires_grad=False)
+        self.decoder_pos_embed = self._build_pos_embed(
+            out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
 
         # build decoder
         self.decoder_blocks = encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
@@ -547,6 +325,20 @@ class PriTDecoder2(nn.Module):
             nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
+
+    def _build_pos_embed(self, h, w, dim, grid_size=1):
+        split_shape = (h // grid_size, grid_size, w // grid_size, grid_size)
+        decoder_pos_embed = build_2d_sincos_position_embedding(h, w, dim)
+        decoder_pos_embed = nn.Parameter(
+            self.grid_patches(decoder_pos_embed, split_shape), requires_grad=False)
+        return decoder_pos_embed.flatten(1, 2)  # BxNxL
+
+    def grid_patches(self, x, split_shape):
+        B, N, L = x.shape
+        x = x.reshape(B, *split_shape, L)               # Bx  (7x8x7x8)  xL
+        x = x.permute([0, 1, 3, 2, 4, 5])               # Bx   7x7x8x8   xL
+        x = x.reshape(B, x.size(1) * x.size(2), -1, L)  # Bx (7x7)x(8x8) xL
+        return x
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -573,7 +365,7 @@ class PriTDecoder2(nn.Module):
             encoded_visible_patches = encoder_linear_proj(x)  # B x (V*G) x D
             B, VG, L = encoded_visible_patches.shape
             G = VG // self.num_visible
-            encoded_visible_patches = encoded_visible_patches.reshape(B, -1, G, L)  # B x V x G x D
+            encoded_visible_patches = encoded_visible_patches.view(B, -1, G, L)  # B x V x G x D
 
             # un-shuffle
             mask_token = getattr(self, f'mask_token{stage_idx}')  # 1 x 1 x 1 x D
@@ -582,11 +374,18 @@ class PriTDecoder2(nn.Module):
             all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x G x D
             all_tokens = all_tokens.reshape(B, -1, L)  # B x (P*G) x D
 
+            # upsample
             if out is not None:
                 upsampled = getattr(self, f'upsampler{stage_idx}')(out)  # B x N x D
                 all_tokens = all_tokens + upsampled
 
+            # pos embedding
+            all_tokens = all_tokens + getattr(self, f'pos_embed{stage_idx}')
+
             out = getattr(self, f'output{stage_idx}')(all_tokens)
+
+        # pos embedding
+        out = out + self.decoder_pos_embed
 
         # decode all tokens
         masked_inds = shuffle[self.num_visible:]
@@ -598,28 +397,6 @@ class PriTDecoder2(nn.Module):
         decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C = B x (37*8*8) x (4*4*3)
 
         return decoded_masked_tokens
-
-
-def build_2d_sincos_position_embedding(h, w, embed_dim, temperature=10000., use_cls_token=False):
-    grid_w = torch.arange(w, dtype=torch.float32)
-    grid_h = torch.arange(h, dtype=torch.float32)
-    grid_w, grid_h = torch.meshgrid(grid_w, grid_h)
-    assert embed_dim % 4 == 0, 'Embed dimension must be divisible by 4 for 2D sin-cos position embedding'
-    pos_dim = embed_dim // 4
-    omega = torch.arange(pos_dim, dtype=torch.float32) / pos_dim
-    omega = 1. / (temperature ** omega)
-    out_w = torch.einsum('m,d->md', [grid_w.flatten(), omega])
-    out_h = torch.einsum('m,d->md', [grid_h.flatten(), omega])
-    pos_emb = torch.cat([torch.sin(out_w), torch.cos(out_w), torch.sin(out_h), torch.cos(out_h)], dim=1)[None, :, :]
-
-    if not use_cls_token:
-        pos_embed = nn.Parameter(pos_emb)
-    else:
-        # Assuming one and only one token, [cls]
-        pe_token = torch.zeros([1, 1, embed_dim], dtype=torch.float32)
-        pos_embed = nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
-    pos_embed.requires_grad = False
-    return pos_embed
 
 
 class PriT1(nn.Module):
