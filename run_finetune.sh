@@ -6,7 +6,7 @@ DATA_PATH='/home/xingyan/Database/ILSVRC2017/Data/CLS-LOC'
 MODEL_PATH='MAE-pytorch_vitb.pth'
 
 # batch_size can be adjusted according to the graphics card
-OMP_NUM_THREADS=1 python -m torch.distributed.launch --nproc_per_node=8 run_class_finetuning.py \
+OMP_NUM_THREADS=1 python -m torch.distributed.launch --nproc_per_node=8 tools/run_class_finetuning.py \
     --model vit_base_patch16_224 \
     --data_path ${DATA_PATH} \
     --finetune ${MODEL_PATH} \
