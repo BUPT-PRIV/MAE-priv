@@ -62,7 +62,7 @@ def create_model(
     # Parameters that aren't supported by all models or are intended to only override model defaults if set
     # should default to None in command line args/cfg. Remove them if they are present and not set so that
     # non-supporting models don't break and default args remain in effect.
-    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    kwargs = {k: v for k, v in kwargs.items()}
 
     create_fn = model_entrypoint(model_name)
     model = create_fn(pretrained=pretrained, **kwargs)
