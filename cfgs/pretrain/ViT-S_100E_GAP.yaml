@@ -1,0 +1,16 @@
+output_dir: 'output/pretrain/vit_small_patch16_224_GAP'
+
+# Architecture
+model: pretrain_mae_small_patch16_224
+use_mean_pooling: True # not use cls-token
+mask_ratio: 0.75
+
+# Train
+opt: adamw
+epochs: 100
+warmup_epochs: 10
+batch_size: 128
+
+# Wandb
+log_wandb: True
+wandb_project: 'mae-pytorch'

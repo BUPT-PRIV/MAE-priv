@@ -15,7 +15,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Iterable
-
+import yaml
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -29,6 +29,10 @@ from utils.optim_factory import create_optimizer
 import mae.modeling_pretrain
 
 def get_args():
+    config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)
+    parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
+                        help='YAML config file specifying default arguments')
+
     parser = argparse.ArgumentParser('MAE pre-training script', add_help=False)
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--epochs', default=300, type=int)
@@ -90,7 +94,7 @@ def get_args():
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--log-wandb', action='store_true', default=False,
+    parser.add_argument('--log-wandb', default=False, type=bool,
                         help='log training and validation metrics to wandb')
     parser.add_argument('--wandb-project', default=None, type=str,
                         help='log training and validation metrics to wandb')
@@ -120,7 +124,20 @@ def get_args():
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
 
-    return parser.parse_args()
+    # Do we have a config file to parse?
+    args_config, remaining = config_parser.parse_known_args()
+    if args_config.config:
+        with open(args_config.config, 'r') as f:
+            cfg = yaml.safe_load(f)
+            parser.set_defaults(**cfg)
+
+    # The main arg parser parses the rest of the args, the usual
+    # defaults will have been overridden if config file specified.
+    args = parser.parse_args(remaining)
+
+    # Cache the args as a text string to save them in the output dir later
+    # args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
+    return args
 
 
 def get_model(args):
@@ -131,7 +148,8 @@ def get_model(args):
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
         normalized_pixel=args.normlize_target,
-        use_mean_pooling=args.use_mean_pooling
+        use_mean_pooling=args.use_mean_pooling,
+        mask_ratio=args.mask_ratio,
     )
 
     return model

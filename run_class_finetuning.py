@@ -13,6 +13,7 @@ import math
 import os
 import sys
 import time
+import yaml
 from collections import OrderedDict
 from pathlib import Path
 from typing import Iterable, Optional
@@ -34,6 +35,10 @@ from utils.optim_factory import create_optimizer, get_parameter_groups, LayerDec
 import mae.modeling_finetune
 
 def get_args():
+    config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)
+    parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
+                        help='YAML config file specifying default arguments')
+
     parser = argparse.ArgumentParser('MAE fine-tuning and evaluation script for image classification', add_help=False)
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--epochs', default=30, type=int)
@@ -105,8 +110,8 @@ def get_args():
     parser.add_argument('--crop_pct', type=float, default=None)
 
     # * Random Erase params
-    parser.add_argument('--reprob', type=float, default=0.25, metavar='PCT',
-                        help='Random erase prob (default: 0.25)')
+    parser.add_argument('--reprob', type=float, default=0.0, metavar='PCT',
+                        help='Random erase prob (default: 0.0)')
     parser.add_argument('--remode', type=str, default='pixel',
                         help='Random erase mode (default: "pixel")')
     parser.add_argument('--recount', type=int, default=1,
@@ -136,7 +141,7 @@ def get_args():
     parser.add_argument('--use_mean_pooling', default=False, type=bool)
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/', type=str,
+    parser.add_argument('--data_path', default='', type=str,
                         help='dataset path')
     parser.add_argument('--eval_data_path', default=None, type=str,
                         help='dataset path for evaluation')
@@ -192,13 +197,25 @@ def get_args():
     parser.add_argument('--wandb-entity', default=None, type=str,
                         help='user or team name of wandb')
 
-    known_args, _ = parser.parse_known_args()
+    # Do we have a config file to parse?
+    args_config, remaining = config_parser.parse_known_args()
+    if args_config.config:
+        with open(args_config.config, 'r') as f:
+            cfg = yaml.safe_load(f)
+            parser.set_defaults(**cfg)
 
-    if known_args.enable_deepspeed:
+    # The main arg parser parses the rest of the args, the usual
+    # defaults will have been overridden if config file specified.
+    args = parser.parse_args(remaining)
+
+    # Cache the args as a text string to save them in the output dir later
+    # args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
+    if args.enable_deepspeed:
         try:
             import deepspeed
             from deepspeed import DeepSpeedConfig
             parser = deepspeed.add_config_arguments(parser)
+            print(parser)
             ds_init = deepspeed.initialize
         except:
             print("Please 'pip install deepspeed==0.4.0'")
@@ -206,7 +223,7 @@ def get_args():
     else:
         ds_init = None
 
-    return parser.parse_args(), ds_init
+    return parser.parse_args(remaining), ds_init
 
 
 def main(args, ds_init):
