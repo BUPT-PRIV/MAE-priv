@@ -65,6 +65,6 @@ def create_model(
     kwargs = {k: v for k, v in kwargs.items()}
 
     create_fn = model_entrypoint(model_name)
-    model = create_fn(pretrained=pretrained, **kwargs)
+    model = create_fn(**kwargs)
 
     return model

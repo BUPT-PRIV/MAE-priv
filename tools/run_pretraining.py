@@ -153,7 +153,6 @@ def get_model(args):
     model = create_model(
         args.model,
         drop_path_rate=args.drop_path,
-        drop_block_rate=None,
         decoder_dim=args.decoder_dim,
         decoder_depth=args.decoder_depth,
         decoder_num_heads=args.decoder_num_heads,

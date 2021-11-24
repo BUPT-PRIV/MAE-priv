@@ -219,7 +219,7 @@ class PretrainVisionTransformer(nn.Module):
                  normalized_pixel=False,
                  mask_ratio=0.75,
                  use_mean_pooling=False,
-                 num_classes=0,  # avoid the error from create_fn in timm
+                 **kwargs,  # avoid the error from create_fn in timm
                  ):
         super().__init__()
         self.encoder = PretrainVisionTransformerEncoder(
