@@ -22,26 +22,23 @@ class DataAugmentationForMAE(object):
         mean = IMAGENET_INCEPTION_MEAN if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_MEAN
         std = IMAGENET_INCEPTION_STD if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_STD
 
-        self.transform = transforms.Compose([
-            transforms.RandomResizedCrop(args.input_size),
+        trans = [transforms.RandomResizedCrop(args.input_size)]
+        if args.hflip > 0.0:
+            trans.append(transforms.RandomHorizontalFlip(args.hflip))
+        trans.extend([
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=torch.tensor(mean),
-                std=torch.tensor(std))
-        ])
+                std=torch.tensor(std))])
 
-        # self.masked_position_generator = RandomMaskingGenerator(
-        #     args.window_size, args.mask_ratio
-        # )
+        self.transform = transforms.Compose(trans)
 
     def __call__(self, image):
-        # return self.transform(image), self.masked_position_generator()
         return self.transform(image)
 
     def __repr__(self):
         repr = "(DataAugmentationForBEiT,\n"
         repr += "  transform = %s,\n" % str(self.transform)
-        # repr += "  Masked position generator = %s,\n" % str(self.masked_position_generator)
         repr += ")"
         return repr
 
