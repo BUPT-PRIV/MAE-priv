@@ -325,7 +325,7 @@ def main(args, ds_init):
             param.requires_grad = False
         else:
             requires_grad.append(name)
-    print(f'require grad parameter: ', requires_grade)
+    print(f'require grad parameter: ', requires_grad)
     # init the fc layer
     getattr(model, linear_keyword).weight.data.normal_(mean=0.0, std=0.01)
     getattr(model, linear_keyword).bias.data.zero_()
@@ -448,7 +448,7 @@ def main(args, ds_init):
         assert model.gradient_accumulation_steps() == args.update_freq
     else:
         if args.distributed:
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
             model_without_ddp = model.module
 
         optimizer = create_optimizer(
@@ -585,11 +585,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # Update LR & WD for the first acc
         if lr_schedule_values is not None or wd_schedule_values is not None and data_iter_step % update_freq == 0:
             for i, param_group in enumerate(optimizer.param_groups):
+                print(i)
                 if lr_schedule_values is not None:
-                    param_group["lr"] = lr_schedule_values[it] * param_group["lr_scale"]
+                    param_group["lr"] = lr_schedule_values[it]
                 if wd_schedule_values is not None and param_group["weight_decay"] > 0:
                     param_group["weight_decay"] = wd_schedule_values[it]
-
+        print('aaa')
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
