@@ -28,6 +28,7 @@ from utils import create_model
 from utils.datasets import build_pretraining_dataset
 from utils.optim_factory import create_optimizer
 
+from mae import modeling_pretrain
 
 def get_args():
     config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)

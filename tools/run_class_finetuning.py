@@ -33,6 +33,7 @@ from utils import create_model
 from utils.datasets import build_dataset
 from utils.optim_factory import create_optimizer, get_parameter_groups, LayerDecayValueAssigner
 
+from mae import modeling_finetune
 
 def get_args():
     config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)
