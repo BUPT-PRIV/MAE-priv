@@ -102,7 +102,7 @@ def get_args():
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--log-wandb', default=False, type=bool,
+    parser.add_argument('--log-wandb', default=False, action='store_true',
                         help='log training and validation metrics to wandb')
     parser.add_argument('--wandb-project', default=None, type=str,
                         help='log training and validation metrics to wandb')
