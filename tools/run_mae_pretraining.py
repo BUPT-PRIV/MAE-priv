@@ -152,9 +152,11 @@ def get_model(args):
     print(f"Creating model: {args.model}")
     model = create_model(
         args.model,
-        pretrained=False,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
+        decoder_dim=args.decoder_dim,
+        decoder_depth=args.decoder_depth,
+        decoder_num_heads=args.decoder_num_heads,
         normalized_pixel=args.normlize_target,
         use_mean_pooling=args.use_mean_pooling,
         mask_ratio=args.mask_ratio,
