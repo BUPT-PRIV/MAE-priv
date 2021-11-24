@@ -147,13 +147,12 @@ class PretrainVisionTransformerDecoder(nn.Module):
     """ Vision Transformer with support for patch or hybrid CNN input stage
     """
 
-    def __init__(self, patch_size=16, num_classes=768, embed_dim=768, depth=12,
+    def __init__(self, patch_size=16, embed_dim=768, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., norm_layer=nn.LayerNorm, init_values=None, num_patches=196,
                  ):
         super().__init__()
-        self.num_classes = num_classes
-        assert num_classes == 3 * patch_size ** 2
+        self.num_classes = num_classes = 3 * patch_size ** 2
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.patch_size = patch_size
 
@@ -205,7 +204,6 @@ class PretrainVisionTransformer(nn.Module):
                  encoder_embed_dim=768,
                  encoder_depth=12,
                  encoder_num_heads=12,
-                 decoder_num_classes=768,
                  decoder_embed_dim=512,
                  decoder_depth=8,
                  decoder_num_heads=8,
@@ -248,7 +246,6 @@ class PretrainVisionTransformer(nn.Module):
         self.decoder = PretrainVisionTransformerDecoder(
             patch_size=patch_size,
             num_patches=self.encoder.patch_embed.num_patches,
-            num_classes=decoder_num_classes,
             embed_dim=decoder_embed_dim,
             depth=decoder_depth,
             num_heads=decoder_num_heads,
@@ -329,7 +326,9 @@ class PretrainVisionTransformer(nn.Module):
 
 
 @register_model
-def pretrain_mae_small_patch16_224(pretrained=False, **kwargs):
+def pretrain_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    if decoder_num_heads is None:
+        decoder_depth = decoder_dim // 64
     model = PretrainVisionTransformer(
         img_size=224,
         patch_size=16,
@@ -337,10 +336,9 @@ def pretrain_mae_small_patch16_224(pretrained=False, **kwargs):
         encoder_depth=12,
         encoder_num_heads=6,
         encoder_num_classes=0,
-        decoder_num_classes=768,
-        decoder_embed_dim=192,
-        decoder_depth=4,
-        decoder_num_heads=3,
+        decoder_embed_dim=decoder_dim,
+        decoder_depth=decoder_depth,
+        decoder_num_heads=decoder_num_heads,
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
@@ -350,7 +348,9 @@ def pretrain_mae_small_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def pretrain_mae_base_patch16_224(pretrained=False, **kwargs):
+def pretrain_mae_base_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    if decoder_num_heads is None:
+        decoder_depth = decoder_dim // 64
     model = PretrainVisionTransformer(
         img_size=224,
         patch_size=16,
@@ -358,10 +358,9 @@ def pretrain_mae_base_patch16_224(pretrained=False, **kwargs):
         encoder_depth=12,
         encoder_num_heads=12,
         encoder_num_classes=0,
-        decoder_num_classes=768,
-        decoder_embed_dim=384,
-        decoder_depth=4,
-        decoder_num_heads=6,
+        decoder_embed_dim=decoder_dim,
+        decoder_depth=decoder_depth,
+        decoder_num_heads=decoder_num_heads,
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
@@ -371,7 +370,9 @@ def pretrain_mae_base_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def pretrain_mae_large_patch16_224(pretrained=False, **kwargs):
+def pretrain_mae_large_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    if decoder_num_heads is None:
+        decoder_depth = decoder_dim // 64
     model = PretrainVisionTransformer(
         img_size=224,
         patch_size=16,
@@ -379,10 +380,9 @@ def pretrain_mae_large_patch16_224(pretrained=False, **kwargs):
         encoder_depth=24,
         encoder_num_heads=16,
         encoder_num_classes=0,
-        decoder_num_classes=768,
-        decoder_embed_dim=512,
-        decoder_depth=8,
-        decoder_num_heads=8,
+        decoder_embed_dim=decoder_dim,
+        decoder_depth=decoder_depth,
+        decoder_num_heads=decoder_num_heads,
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),

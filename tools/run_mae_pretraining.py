@@ -47,6 +47,12 @@ def get_args():
                         help='ratio of the visual tokens/patches need be masked')
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size for backbone')
+    parser.add_argument('--decoder_dim', default=512, type=int,
+                        help='images input size for backbone')
+    parser.add_argument('--decoder_depth', default=8, type=int,
+                        help='images input size for backbone')
+    parser.add_argument('--decoder_num_heads', default=None, type=int,
+                        help='images input size for backbone')
     parser.add_argument('--drop_path', type=float, default=0.0, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
     parser.add_argument('--normlize_target', default=True, type=bool,
