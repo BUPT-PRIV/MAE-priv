@@ -1,15 +1,15 @@
-output_dir: 'output/pretrain/small_baseline/vit_small_400e_patch16_224_token'
+output_dir: 'output/pretrain/small_baseline/vit_small_1600e_patch16_224_token'
 
 # Architecture
 model: pretrain_mae_small_patch16_224
 decoder_dim: 192
 decoder_depth: 4
-use_mean_pooling: False
+use_mean_pooling: True
 normlize_target: True
 mask_ratio: 0.75
 
 # Train
-epochs: 400
+epochs: 1600
 opt: adamw
 lr: 0.00015 # base_lr = 1.5e-4, lr = base_lr * batch-size / 256
 warmup_lr: 0.000001 # 1e-6
