@@ -1,0 +1,23 @@
+output_dir: 'output/pretrain/small_baseline/vit_small_1600e_patch16_224_token'
+
+# Architecture
+model: pretrain_mae_small_patch16_224
+decoder_dim: 192
+decoder_depth: 4
+use_mean_pooling: False
+normlize_target: True
+mask_ratio: 0.75
+
+# Train
+epochs: 1600
+opt: adamw
+lr: 0.00015 # base_lr = 1.5e-4, lr = base_lr * batch-size / 256
+warmup_lr: 0.000001 # 1e-6
+min_lr: 0.00001 # 1e-5
+warmup_epochs: 40
+batch_size: 512
+hflip: 0.5
+
+# Wandb
+log_wandb: True
+wandb_project: 'MAE-Pretrain'
