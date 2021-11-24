@@ -308,7 +308,7 @@ class VisionTransformer(nn.Module):
             if self.fc_norm is not None:
                 return self.fc_norm(x.mean(1))
             else:
-                x.mean(1)
+                return x.mean(1)
         else:
             return x[:, 0]
 
