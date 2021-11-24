@@ -1,4 +1,4 @@
-output_dir: 'output/pretrain/small_baseline/vit_small_200e_patch16_224_token'
+output_dir: 'output/pretrain/small_baseline/vit_small_200e_patch16_224_GAP'
 
 # Architecture
 model: pretrain_mae_small_patch16_224
