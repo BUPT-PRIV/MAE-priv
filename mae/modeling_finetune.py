@@ -232,7 +232,6 @@ class VisionTransformer(nn.Module):
                 init_values=init_values)
             for i in range(depth)])
         self.norm = nn.Identity() if use_mean_pooling else norm_layer(embed_dim)
-        self.fc_norm = norm_layer(embed_dim) if use_mean_pooling else None
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
         if use_learnable_pos_emb:
@@ -303,9 +302,8 @@ class VisionTransformer(nn.Module):
             x = blk(x)
 
         x = self.norm(x)
-        if self.fc_norm is not None:
-            # return self.fc_norm(x[:, 1:].mean(1))
-            return self.fc_norm(x.mean(1))
+        if self.use_mean_pooling:
+            return x.mean(1)
         else:
             return x[:, 0]
 
