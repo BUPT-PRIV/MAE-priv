@@ -166,9 +166,6 @@ def get_model(args):
 
 def main(args):
     utils.init_distributed_mode(args)
-
-    print(args)
-
     device = torch.device(args.device)
 
     # fix the seed for reproducibility
@@ -205,6 +202,8 @@ def main(args):
         log_writer = utils.WandbLogger(args)
     else:
         log_writer = None
+
+    print(args)
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, sampler=sampler_train,
