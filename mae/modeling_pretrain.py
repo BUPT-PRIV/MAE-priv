@@ -10,10 +10,10 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
-
-from .modeling_finetune import Block, _cfg, PatchEmbed, get_sinusoid_encoding_table
+from .modeling_finetune import Block, _cfg, PatchEmbed
 
 
 def trunc_normal_(tensor, mean=0., std=1.):

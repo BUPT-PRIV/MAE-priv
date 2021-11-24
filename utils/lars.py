@@ -33,17 +33,17 @@ class Lars(Optimizer):
     """
 
     def __init__(
-        self,
-        params,
-        lr=1.0,
-        momentum=0,
-        dampening=0,
-        weight_decay=0,
-        nesterov=False,
-        trust_coeff=0.001,
-        eps=1e-8,
-        trust_clip=False,
-        always_adapt=False,
+            self,
+            params,
+            lr=1.0,
+            momentum=0,
+            dampening=0,
+            weight_decay=0,
+            nesterov=False,
+            trust_coeff=0.001,
+            eps=1e-8,
+            trust_clip=False,
+            always_adapt=False,
     ):
         if lr < 0.0:
             raise ValueError(f"Invalid learning rate: {lr}")

@@ -8,12 +8,11 @@
 import os
 
 import torch
-from utils import create_transform
-from .data_constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
 from torchvision import datasets, transforms
 
+from utils import create_transform
+from .data_constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
 from .dataset_folder import ImageFolder
-from .masking_generator import RandomMaskingGenerator
 
 
 class DataAugmentationForMAE(object):

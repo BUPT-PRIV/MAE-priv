@@ -5,6 +5,7 @@
 # https://github.com/facebookresearch/deit
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
+import _init_paths
 
 import argparse
 import datetime
@@ -13,7 +14,6 @@ import math
 import os
 import sys
 import time
-import yaml
 from collections import OrderedDict
 from pathlib import Path
 from typing import Iterable, Optional
@@ -21,7 +21,7 @@ from typing import Iterable, Optional
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-from utils import create_model
+import yaml
 
 import utils
 from utils import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
@@ -29,17 +29,18 @@ from utils import Mixup
 from utils import ModelEma
 from utils import NativeScalerWithGradNormCount as NativeScaler
 from utils import accuracy
+from utils import create_model
 from utils.datasets import build_dataset
 from utils.optim_factory import create_optimizer, get_parameter_groups, LayerDecayValueAssigner
 
-import mae.modeling_finetune
 
 def get_args():
     config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)
     parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
                         help='YAML config file specifying default arguments')
 
-    parser = argparse.ArgumentParser('MAE linear-probing and evaluation script for image classification', add_help=False)
+    parser = argparse.ArgumentParser('MAE linear-probing and evaluation script for image classification',
+                                     add_help=False)
     parser.add_argument('--batch_size', default=2048, type=int)
     parser.add_argument('--epochs', default=90, type=int)
     parser.add_argument('--update_freq', default=1, type=int)

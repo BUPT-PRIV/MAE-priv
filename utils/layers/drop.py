@@ -20,7 +20,7 @@ import torch.nn.functional as F
 
 
 def drop_block_2d(
-        x, drop_prob: float = 0.1, block_size: int = 7,  gamma_scale: float = 1.0,
+        x, drop_prob: float = 0.1, block_size: int = 7, gamma_scale: float = 1.0,
         with_noise: bool = False, inplace: bool = False, batchwise: bool = False):
     """ DropBlock. See https://arxiv.org/pdf/1810.12890.pdf
 
@@ -32,7 +32,7 @@ def drop_block_2d(
     clipped_block_size = min(block_size, min(W, H))
     # seed_drop_rate, the gamma parameter
     gamma = gamma_scale * drop_prob * total_size / clipped_block_size ** 2 / (
-        (W - block_size + 1) * (H - block_size + 1))
+            (W - block_size + 1) * (H - block_size + 1))
 
     # Forces the block to be inside the feature map.
     w_i, h_i = torch.meshgrid(torch.arange(W).to(x.device), torch.arange(H).to(x.device))
@@ -109,6 +109,7 @@ def drop_block_fast_2d(
 class DropBlock2d(nn.Module):
     """ DropBlock. See https://arxiv.org/pdf/1810.12890.pdf
     """
+
     def __init__(self,
                  drop_prob=0.1,
                  block_size=7,
@@ -160,6 +161,7 @@ def drop_path(x, drop_prob: float = 0., training: bool = False):
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
     """
+
     def __init__(self, drop_prob=None):
         super(DropPath, self).__init__()
         self.drop_prob = drop_prob

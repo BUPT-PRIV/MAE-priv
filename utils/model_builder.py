@@ -1,7 +1,6 @@
 from .registry import is_model_in_modules, model_entrypoint
 
 
-
 def split_model_name(model_name):
     model_split = model_name.split(':', 1)
     if len(model_split) == 1:
@@ -15,6 +14,7 @@ def split_model_name(model_name):
 def safe_model_name(model_name, remove_source=True):
     def make_safe(name):
         return ''.join(c if c.isalnum() else '_' for c in name).rstrip('_')
+
     if remove_source:
         model_name = split_model_name(model_name)[-1]
     return make_safe(model_name)

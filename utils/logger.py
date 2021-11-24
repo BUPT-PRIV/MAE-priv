@@ -1,10 +1,12 @@
 import datetime
 import time
 from collections import defaultdict, deque
-from .dist import is_dist_avail_and_initialized
+
 import torch
 import torch.distributed as dist
 import wandb
+
+from .dist import is_dist_avail_and_initialized
 
 
 class SmoothedValue(object):

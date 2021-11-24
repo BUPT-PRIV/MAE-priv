@@ -2,8 +2,8 @@
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
-from itertools import repeat
 import collections.abc
+from itertools import repeat
 
 
 # From PyTorch internals
@@ -12,6 +12,7 @@ def _ntuple(n):
         if isinstance(x, collections.abc.Iterable):
             return x
         return tuple(repeat(x, n))
+
     return parse
 
 

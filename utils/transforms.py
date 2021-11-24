@@ -1,10 +1,11 @@
+import math
+import random
+import warnings
+
+import numpy as np
 import torch
 import torchvision.transforms.functional as F
 from PIL import Image
-import warnings
-import math
-import random
-import numpy as np
 
 
 class ToNumpy:

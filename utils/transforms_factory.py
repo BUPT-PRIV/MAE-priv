@@ -8,10 +8,10 @@ import math
 import torch
 from torchvision import transforms
 
-from .data_constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, DEFAULT_CROP_PCT
 from .auto_augment import rand_augment_transform, augment_and_mix_transform, auto_augment_transform
-from .transforms import _pil_interp, RandomResizedCropAndInterpolation, ToNumpy, ToTensor
+from .data_constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, DEFAULT_CROP_PCT
 from .random_erasing import RandomErasing
+from .transforms import _pil_interp, RandomResizedCropAndInterpolation, ToNumpy
 
 
 def transforms_noaug_train(
@@ -67,7 +67,7 @@ def transforms_imagenet_train(
      * normalizes and converts the branches above with the third, final transform
     """
     scale = tuple(scale or (0.08, 1.0))  # default imagenet scale range
-    ratio = tuple(ratio or (3./4., 4./3.))  # default imagenet ratio range
+    ratio = tuple(ratio or (3. / 4., 4. / 3.))  # default imagenet ratio range
     primary_tfl = [
         RandomResizedCropAndInterpolation(img_size, scale=scale, ratio=ratio, interpolation=interpolation)]
     if hflip > 0.:
@@ -157,8 +157,8 @@ def transforms_imagenet_eval(
         tfl += [
             transforms.ToTensor(),
             transforms.Normalize(
-                     mean=torch.tensor(mean),
-                     std=torch.tensor(std))
+                mean=torch.tensor(mean),
+                std=torch.tensor(std))
         ]
 
     return transforms.Compose(tfl)
@@ -185,7 +185,6 @@ def create_transform(
         crop_pct=None,
         tf_preprocessing=False,
         separate=False):
-
     if isinstance(input_size, (tuple, list)):
         img_size = input_size[-2:]
     else:

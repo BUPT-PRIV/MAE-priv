@@ -6,9 +6,11 @@
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
 import json
-from .lars import Lars
+
 import torch
 from torch import optim as optim
+
+from .lars import Lars
 
 # from timm.optim.adafactor import Adafactor
 # from timm.optim.adahessian import Adahessian

@@ -5,6 +5,7 @@
 # https://github.com/facebookresearch/deit
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
+import _init_paths
 
 import argparse
 import datetime
@@ -15,18 +16,18 @@ import sys
 import time
 from pathlib import Path
 from typing import Iterable
-import yaml
+
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-from utils import create_model
+import yaml
 
 import utils
 from utils import NativeScalerWithGradNormCount as NativeScaler
+from utils import create_model
 from utils.datasets import build_pretraining_dataset
 from utils.optim_factory import create_optimizer
 
-import mae.modeling_pretrain
 
 def get_args():
     config_parser = parser = argparse.ArgumentParser(description='Training Config', add_help=False)
