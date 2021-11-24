@@ -206,7 +206,7 @@ class VisionTransformer(nn.Module):
                  use_learnable_pos_emb=False,
                  init_scale=0.,
                  use_mean_pooling=False,
-                 fc_norm=True):
+                 lin_probe=False):
         super().__init__()
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
@@ -233,7 +233,15 @@ class VisionTransformer(nn.Module):
                 init_values=init_values)
             for i in range(depth)])
         self.norm = nn.Identity() if use_mean_pooling else norm_layer(embed_dim)
-        self.fc_norm = norm_layer(embed_dim) if use_mean_pooling and fc_norm else None
+        self.lin_probe = lin_probe
+        if use_mean_pooling:
+            if lin_probe:
+                self.fc_norm = nn.BatchNorm1d(embed_dim, affine=False)
+            else:
+                self.fc_norm = norm_layer(embed_dim)
+        else:
+            self.fc_norm = None
+
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
         if use_learnable_pos_emb:
@@ -305,10 +313,7 @@ class VisionTransformer(nn.Module):
 
         x = self.norm(x)
         if self.use_mean_pooling:
-            if self.fc_norm is not None:
-                return self.fc_norm(x.mean(1))
-            else:
-                return x.mean(1)
+            return self.fc_norm(x.mean(1))
         else:
             return x[:, 0]
 

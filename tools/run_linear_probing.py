@@ -58,7 +58,7 @@ def get_args():
                         help='Dropout rate (default: 0.)')
     parser.add_argument('--attn_drop_rate', type=float, default=0.0, metavar='PCT',
                         help='Attention dropout rate (default: 0.)')
-    parser.add_argument('--drop_path', type=float, default=0.1, metavar='PCT',
+    parser.add_argument('--drop_path', type=float, default=0.0, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
 
     parser.add_argument('--disable_eval_during_finetuning', action='store_true', default=False)
@@ -314,7 +314,7 @@ def main(args, ds_init):
         drop_block_rate=None,
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
-        fc_norm=False,
+        lin_probe=False,
     )
 
     # freeze all layers but the last fc
