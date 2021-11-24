@@ -319,9 +319,10 @@ def main(args, ds_init):
 
     # freeze all layers but the last fc
     linear_keyword = 'head'
+    head_norm = 'fc_norm'
     requires_grad = []
     for name, param in model.named_parameters():
-        if name not in ['%s.weight' % linear_keyword, '%s.bias' % linear_keyword]:
+        if name not in ['%s.weight' % linear_keyword, '%s.bias' % linear_keyword] or head_norm not in name:
             param.requires_grad = False
         else:
             requires_grad.append(name)
