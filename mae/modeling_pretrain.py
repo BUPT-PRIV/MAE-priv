@@ -350,7 +350,7 @@ def pretrain_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
 @register_model
 def pretrain_mae_base_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     if decoder_num_heads is None:
-        decoder_depth = decoder_dim // 64
+        decoder_num_heads = decoder_dim // 64
     model = PretrainVisionTransformer(
         img_size=224,
         patch_size=16,
