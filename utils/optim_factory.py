@@ -6,7 +6,7 @@
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
 import json
-
+from .lars import Lars
 import torch
 from torch import optim as optim
 
@@ -133,6 +133,8 @@ def create_optimizer(args, model, get_num_layer=None, get_layer_scale=None, filt
         optimizer = optim.Adam(parameters, **opt_args)
     elif opt_lower == 'adamw':
         optimizer = optim.AdamW(parameters, **opt_args)
+    elif opt_lower == 'lars':
+        optimizer = Lars(parameters, momentum=args.momentum, **opt_args)
     # elif opt_lower == 'nadam': # TODO support more optimizers
     #     optimizer = Nadam(parameters, **opt_args)
     # elif opt_lower == 'radam':
