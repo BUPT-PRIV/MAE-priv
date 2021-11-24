@@ -12,12 +12,12 @@ weight_decay: 0.0
 warmup_epochs: 10
 batch_size: 2048
 dist_eval: True
-#reprob: 0.25
 
 # Data Aug
 mixup: 0.0
 cutmix: 0.0
+#reprob: 0.25
 
 # Wandb
 log_wandb: True
-wandb_project: 'mae-lincls'
+wandb_project: 'MAE-Linear_Probe'

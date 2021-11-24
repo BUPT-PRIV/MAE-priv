@@ -9,8 +9,8 @@ mask_ratio: 0.75
 opt: adamw
 epochs: 100
 warmup_epochs: 10
-batch_size: 128
+batch_size: 512
 
 # Wandb
 log_wandb: True
-wandb_project: 'mae-pytorch'
+wandb_project: 'MAE-Pretrain'

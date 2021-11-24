@@ -84,8 +84,8 @@ def get_args():
                         help='epochs to warmup LR, if scheduler supports')
 
     # Augmentation parameters
-    parser.add_argument('--hflip', type=float, default=0.0,
-                        help='horizontal flip (default: 0.0)')
+    parser.add_argument('--hflip', type=float, default=0.5,
+                        help='horizontal flip (default: 0.5)')
     parser.add_argument('--train_interpolation', type=str, default='bicubic',
                         help='Training interpolation (random, bilinear, bicubic default: "bicubic")')
 
