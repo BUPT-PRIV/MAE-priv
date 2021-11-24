@@ -314,6 +314,7 @@ def main(args, ds_init):
         drop_block_rate=None,
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
+        fc_norm=False,
     )
 
     # freeze all layers but the last fc
