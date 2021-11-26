@@ -553,3 +553,26 @@ def pretrain_prit_mae_small_patch16_224(pretrained=False, **kwargs):
         normalized_pixel=normalized_pixel)
     model.default_cfg = _cfg()
     return model
+
+
+@register_model
+def pretrain_prit_small_patch16_224(pretrained=False, **kwargs):
+    normalized_pixel=kwargs.pop('normalized_pixel')
+    model = PriT1(
+        partial(
+            PriTEncoder,
+            img_size=224,
+            patch_size=4,
+            embed_dim=24,
+            strides=(1, 2, 2, 2),
+            depths=(2, 2, 6, 2),
+            dims=(24, 48, 96, 192),
+            num_heads=6,
+            **kwargs,
+        ),
+        decoder_dim=192,
+        decoder_depth=1,
+        decoder_num_heads=3,
+        normalized_pixel=normalized_pixel)
+    model.default_cfg = _cfg()
+    return model

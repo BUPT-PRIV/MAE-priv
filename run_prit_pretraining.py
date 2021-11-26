@@ -78,8 +78,8 @@ def get_args():
                         help='epochs to warmup LR, if scheduler supports')
 
     # Augmentation parameters
-    parser.add_argument('--color_jitter', type=float, default=0.0, metavar='PCT',
-                        help='Color jitter factor (default: 0.4)')
+    parser.add_argument('--hflip', type=float, default=0.0,
+                        help='horizontal flip (default: 0.0)')
     parser.add_argument('--train_interpolation', type=str, default='bicubic',
                         help='Training interpolation (random, bilinear, bicubic default: "bicubic")')
 
