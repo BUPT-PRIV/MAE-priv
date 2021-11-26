@@ -10,3 +10,4 @@ output/
 wandb/
 runs/
 .vscode/
+*.pth
