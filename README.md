@@ -14,7 +14,11 @@ This repo is mainly based on [moco-v3](https://github.com/facebookresearch/moco-
 - [ ] ...
 
 ## Main Result
-### ViT-Small
+### ViT-Base
+
+| pretrain epoch | accuracy | config                                                       |
+| -------------- | -------- | ------------------------------------------------------------ |
+| 400            | 83.08%   | [pretrain](cfgs/pretrain/ViT-B_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-B_100E_GAP.yaml) |
 
 ## Usage
 
