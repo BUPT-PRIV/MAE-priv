@@ -533,7 +533,9 @@ class PriT2(nn.Module):
 
 
 @register_model
-def pretrain_prit_mae_small_patch16_224(pretrained=False, **kwargs):
+def pretrain_prit_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
     normalized_pixel=kwargs.pop('normalized_pixel')
     model = PriT1(
         partial(
@@ -547,16 +549,18 @@ def pretrain_prit_mae_small_patch16_224(pretrained=False, **kwargs):
             num_heads=6,
             **kwargs,
         ),
-        decoder_dim=192,
-        decoder_depth=4,
-        decoder_num_heads=3,
+        decoder_dim=decoder_dim,  # 192
+        decoder_depth=decoder_depth,  # 4
+        decoder_num_heads=decoder_num_heads,  # 3
         normalized_pixel=normalized_pixel)
     model.default_cfg = _cfg()
     return model
 
 
 @register_model
-def pretrain_prit_small_patch16_224(pretrained=False, **kwargs):
+def pretrain_prit_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
     normalized_pixel=kwargs.pop('normalized_pixel')
     model = PriT1(
         partial(
@@ -570,9 +574,9 @@ def pretrain_prit_small_patch16_224(pretrained=False, **kwargs):
             num_heads=6,
             **kwargs,
         ),
-        decoder_dim=192,
-        decoder_depth=4,
-        decoder_num_heads=3,
+        decoder_dim=decoder_dim,  # 192
+        decoder_depth=decoder_depth,  # 4
+        decoder_num_heads=decoder_num_heads,  # 3
         normalized_pixel=normalized_pixel)
     model.default_cfg = _cfg()
     return model
