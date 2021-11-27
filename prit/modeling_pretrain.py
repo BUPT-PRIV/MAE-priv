@@ -200,8 +200,6 @@ class PriTDecoder1(nn.Module):
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
         num_features = encoder.dims[stage_idx - 1]
-        num_heads = decoder_dim // (num_features // encoder.num_heads)
-        decoder_num_heads = decoder_num_heads or num_heads
         self.num_layers = encoder.num_layers  # 4
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
@@ -217,7 +215,7 @@ class PriTDecoder1(nn.Module):
             out_size[0], out_size[1], decoder_dim)
 
         # build decoder
-        self.decoder_blocks = encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
+        self.decoder_blocks = encoder._build_blocks(decoder_dim, decoder_num_heads, decoder_depth)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
@@ -279,9 +277,6 @@ class PriTDecoder2(nn.Module):
         stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 4 for stage1
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 56 for stage1
-        num_features = encoder.dims[stage_idx - 1]
-        num_heads = decoder_dim // (num_features // encoder.num_heads)
-        decoder_num_heads = decoder_num_heads or num_heads
         self.num_layers = encoder.num_layers  # 4
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
@@ -304,14 +299,14 @@ class PriTDecoder2(nn.Module):
             pos_embed = self._build_pos_embed(img_size[0] // s, img_size[1] // s, decoder_dim,
                 grid_size=encoder.strides[stage_idx] if stage_idx < self.num_layers else 1)
             setattr(self, f'pos_embed{stage_idx}', pos_embed)
-            setattr(self, f'output{stage_idx}', Output(decoder_dim, num_heads))
+            setattr(self, f'output{stage_idx}', Output(decoder_dim, decoder_num_heads))
 
         # pos_embed
         self.decoder_pos_embed = self._build_pos_embed(
             out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
 
         # build decoder
-        self.decoder_blocks = encoder._build_blocks(decoder_dim, num_heads, decoder_depth)
+        self.decoder_blocks = encoder._build_blocks(decoder_dim, decoder_num_heads, decoder_depth)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
