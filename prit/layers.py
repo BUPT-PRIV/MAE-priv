@@ -105,6 +105,26 @@ class Block(nn.Module):
         return x
 
 
+class LocalBlock(Block):
+    def __init__(self, num_patches, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.num_patches = num_patches
+
+    def forward(self, x):
+        B, N, L = x.shape
+        if self.gamma_1 is None:
+            x = x.view(-1, N // self.num_patches, L)  # B*12 x 8*8 x L
+            x = x + self.drop_path(self.attn(self.norm1(x)))
+            x = x.view(B, N, L)
+            x = x + self.drop_path(self.mlp(self.norm2(x)))
+        else:
+            x = x.view(-1, N // self.num_patches, L)  # B*12 x 8*8 x L
+            x = x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
+            x = x.view(B, N, L)
+            x = x + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x)))
+        return x
+
+
 class PatchEmbed(nn.Module):
     """ Image to Patch Embedding
     """
