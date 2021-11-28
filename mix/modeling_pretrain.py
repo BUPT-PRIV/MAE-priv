@@ -299,8 +299,8 @@ class PretrainVisionTransformer(nn.Module):
 
     def forward(self, x):
         # x, target = self.mix(x)
-        target, mix_idx = torch.randperm(x)
-        B, C, H, W = x.size()
+        target, mix_idx = self.mix(x)
+        B, C, H, W = target.size()
 
         encoded_visible_patches, shuffle = self.encoder(x)  # [B, N_vis, C_e]
         encoded_visible_patches = self.encoder_to_decoder(encoded_visible_patches)  # [B, N_vis, C_d]
