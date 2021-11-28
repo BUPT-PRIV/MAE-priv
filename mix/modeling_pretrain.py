@@ -298,8 +298,8 @@ class PretrainVisionTransformer(nn.Module):
             return F.mse_loss(x, y, reduction="mean")
 
     def forward(self, x):
-        # x, target = self.mix(x)
-        target, mix_idx = self.mix(x)
+        x, target = self.mix(x)
+        # target, mix_idx = self.mix(x)
         B, C, H, W = target.size()
 
         encoded_visible_patches, shuffle = self.encoder(x)  # [B, N_vis, C_e]
@@ -309,7 +309,7 @@ class PretrainVisionTransformer(nn.Module):
             [encoded_visible_patches, self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])], dim=1
         )[:, shuffle.sort()[1], :]
 
-        decoder_input = 0.5 * (decoder_input + decoder_input[mix_idx])
+        # decoder_input = 0.5 * (decoder_input + decoder_input[mix_idx])
         decoder_input = decoder_input + self.decoder_pos_embed
 
         # decode (encoded_visible_patches + mask_token)
