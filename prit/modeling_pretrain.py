@@ -10,7 +10,7 @@ from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 
 from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output, LocalBlock
-from .utils import build_2d_sincos_position_embedding, _cfg
+from .utils import build_2d_sincos_position_embedding, print_number_of_params, _cfg
 
 
 def trunc_normal_(tensor, mean=0., std=1.):
@@ -124,6 +124,10 @@ class PriTEncoder(nn.Module):
                     dpr=[dpr.pop() for _ in range(depths[i])],
                     init_values=init_values, block=blocks[i]),
             ))
+            # print(f'stage{i + 1} ' + '#' * 100)
+            # print_number_of_params(getattr(self, f'stage{i + 1}')[0])  # PatchDownsample
+            # print_number_of_params(getattr(self, f'stage{i + 1}')[1])  # Block
+
         self.norm = norm_layer(self.num_features)
 
         # weight initialization
@@ -420,6 +424,13 @@ class PriT1(nn.Module):
         self.decoder = PriTDecoder1(self.encoder, decoder_dim=decoder_dim,
             decoder_depth=decoder_depth, decoder_num_heads=decoder_num_heads)
 
+        # print(f'PriT Encoder ' + '#' * 100)
+        # print_number_of_params(self.encoder)
+        # print(f'PriT Decoder ' + '#' * 100)
+        # print_number_of_params(self.decoder)
+        # print(f'PriT ' + '#' * 100)
+        # print_number_of_params(self)
+
     @torch.jit.ignore
     def no_weight_decay(self):
         return (set('encoder.' + name for name in list(self.encoder.no_weight_decay())) |
@@ -537,6 +548,7 @@ class PriT2(nn.Module):
 
 @register_model
 def pretrain_prit_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    # 23.58624 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
     normalized_pixel=kwargs.pop('normalized_pixel')
@@ -563,6 +575,7 @@ def pretrain_prit_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_
 
 @register_model
 def pretrain_prit_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    # 4.066104 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
     normalized_pixel=kwargs.pop('normalized_pixel')
@@ -589,6 +602,7 @@ def pretrain_prit_small_patch16_224(decoder_dim, decoder_depth, decoder_num_head
 
 @register_model
 def pretrain_prit_local_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    # 4.066104 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
     normalized_pixel=kwargs.pop('normalized_pixel')
@@ -601,6 +615,33 @@ def pretrain_prit_local_small_patch16_224(decoder_dim, decoder_depth, decoder_nu
             strides=(1, 2, 2, 2),
             depths=(2, 2, 6, 2),
             dims=(24, 48, 96, 192),
+            blocks_type=('local', 'normal', 'normal', 'normal'),
+            num_heads=6,
+            **kwargs,
+        ),
+        decoder_dim=decoder_dim,  # 192
+        decoder_depth=decoder_depth,  # 4
+        decoder_num_heads=decoder_num_heads,  # 3
+        normalized_pixel=normalized_pixel)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def pretrain_prit_local_small_b_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    # 23.534112 M
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    normalized_pixel=kwargs.pop('normalized_pixel')
+    model = PriT1(
+        partial(
+            PriTEncoder,
+            img_size=224,
+            patch_size=4,
+            embed_dim=96,
+            strides=(1, 2, 2, 2),
+            depths=(2, 2, 7, 1),
+            dims=(96, 192, 384, 768),
             blocks_type=('local', 'normal', 'normal', 'normal'),
             num_heads=6,
             **kwargs,

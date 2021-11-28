@@ -16,4 +16,4 @@ dist_eval: True
 
 # Wandb
 log_wandb: True
-wandb_project: 'PriT-Finetune'
+wandb_project: 'PriT_Finetune'

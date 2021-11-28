@@ -6,6 +6,11 @@ def _cfg(url='', **kwargs):
     return {'url': url, **kwargs}
 
 
+def print_number_of_params(model):
+    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print('number of params: {} M'.format(n_parameters / 1e6))
+
+
 def build_2d_sincos_position_embedding(h, w, embed_dim, temperature=10000., use_cls_token=False):
     grid_w = torch.arange(w, dtype=torch.float32)
     grid_h = torch.arange(h, dtype=torch.float32)
