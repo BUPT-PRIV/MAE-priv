@@ -547,7 +547,7 @@ class PriT2(nn.Module):
 
 
 @register_model
-def pretrain_prit_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_vit_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.58624 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
