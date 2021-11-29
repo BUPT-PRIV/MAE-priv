@@ -3,7 +3,7 @@
 ## Introduction
 This is an unofficial PyTorch implementation of [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377) for self-supervised ViT.
 
-This repo is mainly based on [moco-v3](https://github.com/facebookresearch/moco-v3), [pytorch-image-models](https://github.com/rwightman/pytorch-image-models) and [BEiT](https://github.com/microsoft/unilm/tree/master/beit)
+This repo is mainly based on [moco-v3](https://github.com/facebookresearch/moco-v3), [pytorch-image-models](https://github.com/rwightman/pytorch-image-models) and [BEiT](https://github.com/microsoft/unilm/tree/master/beit).
 
 ## TODO
 - [ ] visualization of reconstruction image
@@ -14,11 +14,25 @@ This repo is mainly based on [moco-v3](https://github.com/facebookresearch/moco-
 - [ ] ...
 
 ## Main Result
+
+We support two representations for classification: **GAP** (Global Average Pooling) and **Cls-token**. According to paper, MAE works similarily well with both of them. In Cls-token mode, it is trained in encoder of MAE.
+
+### ViT-Small
+
+| pretrain epoch | representation | accuracy |                            config                            |      weight       |
+| :------------: | :------------: | :------: | :----------------------------------------------------------: | :---------------: |
+|      100       |      GAP       |    -     | [pretrain](cfgs/pretrain/baseline_small/ViT-S_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | pretrain finetune |
+|      200       |      GAP       |    -     | [pretrain](cfgs/pretrain/baseline_small/ViT-S_200E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | pretrain finetune |
+|      400       |      GAP       |  77.56%  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | pretrain finetune |
+|      800       |      GAP       |    -     | [pretrain](cfgs/pretrain/baseline_small/ViT-S_800E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | pretrain finetune |
+|      1600      |      GAP       |    -     | [pretrain](cfgs/pretrain/baseline_small/ViT-S_1600E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | pretrain finetune |
+
+
 ### ViT-Base
 
-| pretrain epoch | accuracy | config                                                       |
-| -------------- | -------- | ------------------------------------------------------------ |
-| 400            | 83.08%   | [pretrain](cfgs/pretrain/ViT-B_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-B_100E_GAP.yaml) |
+| pretrain epoch | representation | accuracy |                            config                            |      weight       |
+| :------------: | :------------: | :------: | :----------------------------------------------------------: | :---------------: |
+|      400       |      GAP       |  83.08%  | [pretrain](cfgs/pretrain/ViT-B_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-B_100E_GAP.yaml) | pretrain finetune |
 
 ## Usage
 
