@@ -16,7 +16,6 @@ warmup_lr: 0.000001 # 1e-6
 min_lr: 0.00001 # 1e-5
 warmup_epochs: 10
 batch_size: 256
-update_freq: 2
 hflip: 0.5
 
 # Wandb
