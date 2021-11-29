@@ -201,7 +201,7 @@ class PriT(nn.Module):
 
 
 @register_model
-def prit_mae_small_patch16_224(pretrained=False, **kwargs):
+def vit_small_patch16_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=16,
