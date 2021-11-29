@@ -9,7 +9,7 @@ from torch.nn.modules.utils import _pair as to_2tuple
 from utils.layers import trunc_normal_
 from utils.registry import register_model
 
-from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output
+from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output, LocalBlock
 from .utils import build_2d_sincos_position_embedding, _cfg
 
 
@@ -29,6 +29,7 @@ class PriT(nn.Module):
                  qk_scale=None, init_values=0., init_scale=0.,
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
+                 blocks_type=('normal', 'normal', 'normal', 'normal'),
                  use_mean_pooling=True, pyramid_reconstruction=False):
         """
         Args:
@@ -100,6 +101,12 @@ class PriT(nn.Module):
             grid_h, grid_w, embed_dim, use_cls_token=use_cls_token)
         self.pos_drop = nn.Dropout(p=drop_rate)
 
+        _blocks ={
+            "normal": Block,
+            "local": partial(LocalBlock, num_patches=self.num_patches),
+        }
+        blocks = tuple(_blocks[b] for b in blocks_type)
+
         dpr = [x.item() for x in torch.linspace(drop_path_rate, 0, sum(depths))]  # stochastic depth decay rule
         for i in range(self.num_layers):
             downsample = i > 0 and (strides[i] == 2 or dims[i - 1] != dims[i])
@@ -107,7 +114,8 @@ class PriT(nn.Module):
                 PatchDownsample(dims[i - 1], dims[i], self.num_patches, stride=strides[i],
                     norm_layer=norm_layer, with_cls_token=use_cls_token) if downsample else nn.Identity(),
                 self._build_blocks(dims[i], num_heads, depths[i],
-                    dpr=[dpr.pop() for _ in range(depths[i])], init_values=init_values),
+                    dpr=[dpr.pop() for _ in range(depths[i])],
+                    init_values=init_values, block=blocks[i]),
             ))
         self.norm = norm_layer(self.num_features) if use_cls_token else nn.Identity()
 
@@ -130,9 +138,9 @@ class PriT(nn.Module):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
 
-    def _build_blocks(self, dim, num_heads, depth, dpr=None, init_values=0.):
+    def _build_blocks(self, dim, num_heads, depth, dpr=None, init_values=0., block=Block):
         dpr = dpr or ([0.] * depth)
-        blocks = [Block(
+        blocks = [block(
             dim=dim, num_heads=num_heads, mlp_ratio=self.mlp_ratio, qkv_bias=self.qkv_bias,
             qk_scale=self.qk_scale, drop=self.drop_rate, attn_drop=self.attn_drop_rate, drop_path=dpr[i],
             norm_layer=self.norm_layer, act_layer=self.act_layer, init_values=init_values)
@@ -201,6 +209,7 @@ def prit_mae_small_patch16_224(pretrained=False, **kwargs):
         strides=[1],
         depths=[12],
         dims=[384],
+        blocks_type=['normal'],
         num_heads=6,
         **kwargs)
     model.default_cfg = _cfg()
@@ -216,6 +225,23 @@ def prit_small_patch16_224(pretrained=False, **kwargs):
         strides=(1, 2, 2, 2),
         depths=(2, 2, 6, 2),
         dims=(24, 48, 96, 192),
+        blocks_type=('normal', 'normal', 'normal', 'normal'),
+        num_heads=6,
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def prit_local_small_patch16_224(pretrained=False, **kwargs):
+    model = PriT(
+        img_size=224,
+        patch_size=4,
+        embed_dim=24,
+        strides=(1, 2, 2, 2),
+        depths=(2, 2, 6, 2),
+        dims=(24, 48, 96, 192),
+        blocks_type=('local', 'normal', 'normal', 'normal'),
         num_heads=6,
         **kwargs)
     model.default_cfg = _cfg()
