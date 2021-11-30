@@ -178,7 +178,7 @@ class LocalBlock(Block):
         return x
 
 
-class SRBlock(Block):
+class SRBlock(nn.Module):
 
     def __init__(self, num_patches, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., init_values=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm,
@@ -199,6 +199,15 @@ class SRBlock(Block):
             self.gamma_2 = nn.Parameter(init_values * torch.ones((dim)), requires_grad=True)
         else:
             self.gamma_1, self.gamma_2 = None, None
+
+    def forward(self, x):
+        if self.gamma_1 is None:
+            x = x + self.drop_path(self.attn(self.norm1(x)))
+            x = x + self.drop_path(self.mlp(self.norm2(x)))
+        else:
+            x = x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
+            x = x + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x)))
+        return x
 
 
 class PatchEmbed(nn.Module):
@@ -325,7 +334,7 @@ class LocalOutput(Output):
         return x
 
 
-class SROutput(Output):
+class SROutput(nn.Module):
     def __init__(self, num_patches, dim, num_heads, qkv_bias=False, drop=0., attn_drop=0.,
                  drop_path=0., norm_layer=nn.LayerNorm):
         super().__init__()
@@ -333,3 +342,7 @@ class SROutput(Output):
         self.attn = SRAttention(num_patches, dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+
+    def forward(self, x):
+        x = x + self.drop_path(self.attn(self.norm1(x)))
+        return x
