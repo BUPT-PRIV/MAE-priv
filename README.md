@@ -3,7 +3,7 @@
 ## Introduction
 This is an unofficial PyTorch implementation of [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377) for self-supervised ViT. This repo is mainly based on [moco-v3](https://github.com/facebookresearch/moco-v3), [pytorch-image-models](https://github.com/rwightman/pytorch-image-models) and [BEiT](https://github.com/microsoft/unilm/tree/master/beit).
 
-<img src="figures/mae.png" alt="image-20211129220622636" style="zoom:50%;" />
+<img src="figures/mae.png" alt="image-mae" style="zoom: 33%;" />
 
 ## TODO
 
@@ -22,7 +22,7 @@ We support two representations for classification: **GAP** (Global Average Pooli
 
 | pretrain epoch | representation | accuracy | k-NN |                            config                            |                            weight                            |                             log                              |
 | :------------: | :------------: | :------: | :--: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|      100       |      GAP       |    -     |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1FZ2ii8FtbO6TDIU9scEH85nVANOLQac1/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/1IuAqrz23PwaA1_B9bYYqD0P4cXAYf2ZE/view?usp=sharing) finetune |
+|      100       |      GAP       |  76.58%  |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1FZ2ii8FtbO6TDIU9scEH85nVANOLQac1/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/1IuAqrz23PwaA1_B9bYYqD0P4cXAYf2ZE/view?usp=sharing) finetune |
 |      200       |      GAP       |    -     |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_200E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1ufbovFHqYhz78Usz01SQ3mNlL0NoqIjC/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/116tiw2HqXQxr4i0xU_ZRDa6IDLP3wvwy/view?usp=sharing) finetune |
 |      400       |      GAP       |  77.56%  |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1GEuNN4yYYkjnKJyh65GDoEfH5s1AOPYm/view?usp=sharing) [finetune](https://drive.google.com/file/d/1v7Iy_FtNpDK89aCsTkAOH3fGZixv_dVs/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1iBastCBVK6goDtjqXSILyuqtR0ppbCmo/view?usp=sharing) [finetune](https://drive.google.com/file/d/1T8titxifdMm55UOP7lkGc27g7UPj97Jh/view?usp=sharing) |
 |      800       |      GAP       |    -     |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_800E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1dmzysQ2phLcbNfrmuSdsK_I5ltokOVXk/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/17mPfUCclcCmWOmQneaNYTQQmYWl3T2U7/view?usp=sharing) finetune |

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import _init_paths
 import os
 import sys
 import argparse
@@ -133,7 +134,7 @@ def extract_feature_pipeline(args):
     test_labels = torch.tensor([s[-1] for s in dataset_val.samples]).long()
     # save features and labels
     if args.save_path and dist.get_rank() == 0:
-        if os.path.exists(args.save_path):
+        if not os.path.exists(args.save_path):
             os.makedirs(args.save_path)
         torch.save(train_features.cpu(), os.path.join(args.save_path, "trainfeat.pth"))
         torch.save(test_features.cpu(), os.path.join(args.save_path, "testfeat.pth"))
