@@ -406,6 +406,125 @@ class PriTDecoder2(nn.Module):
         return decoded_masked_tokens
 
 
+class PriTDecoder3(nn.Module):
+    """
+    PyramidReconstructionImageTransformer Decoder
+    """
+
+    def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8):
+        super().__init__()
+        stage_idx = 1
+
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 4 for stage1
+        img_size = encoder.img_size  # 224
+        out_size = (img_size[0] // stride, img_size[1] // stride)  # 56 for stage1
+        self.num_layers = encoder.num_layers  # 4
+        self.num_patches = encoder.num_patches  # 49
+        self.num_visible = encoder.num_visible  # 12
+        self.num_masked = encoder.num_masked  # 37
+        self.stride = stride
+
+        # build encoder linear projection(s) and output attention(s)
+        for stage_idx, dim in enumerate(encoder.dims, 1):
+            setattr(self, f'encoder_linear_proj{stage_idx}', nn.Linear(dim, decoder_dim))
+            setattr(self, f'output{stage_idx}', Output(decoder_dim, decoder_num_heads))
+
+        # build mask token
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, 1, decoder_dim))
+
+        # build upsampler(s)
+        for stage_idx, s in enumerate(encoder.strides[1:], 1):
+            setattr(self, f'upsampler{stage_idx}',
+                nn.Identity() if s == 1 else PatchUpsample(self.num_visible, stride=s))
+
+        # pos_embed
+        self.decoder_pos_embed = self._build_pos_embed(
+            out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
+
+        # build decoder
+        self.decoder_blocks = encoder._build_blocks(decoder_dim, decoder_num_heads, decoder_depth)
+        self.decoder_norm = encoder.norm_layer(decoder_dim)
+        self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
+
+        # weight initialization
+        self.apply(self._init_weights)
+        trunc_normal_(self.mask_token, std=.02)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+
+    def _build_pos_embed(self, h, w, dim, grid_size=1):
+        split_shape = (h // grid_size, grid_size, w // grid_size, grid_size)
+        decoder_pos_embed = build_2d_sincos_position_embedding(h, w, dim)
+        decoder_pos_embed = self.grid_patches(decoder_pos_embed, split_shape)
+        decoder_pos_embed = decoder_pos_embed.flatten(1, 2)  # BxNxL
+        return nn.Parameter(decoder_pos_embed, requires_grad=False)
+
+    def grid_patches(self, x, split_shape):
+        B, N, L = x.shape
+        x = x.reshape(B, *split_shape, L)               # Bx  (7x8x7x8)  xL
+        x = x.permute([0, 1, 3, 2, 4, 5])               # Bx   7x7x8x8   xL
+        x = x.reshape(B, x.size(1) * x.size(2), -1, L)  # Bx (7x7)x(8x8) xL
+        return x
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return {'decoder_pos_embed'} | {f'mask_token{i + 1}' for i in range(self.num_layers)}
+
+    def forward(self, xs, shuffle):
+        """
+            B: batch size
+            V: num_visible
+            M: num_masked
+            P: num_patches, P=V+M
+            G: grid_h * grid_w = Gh * Gw
+            D: decoder_dim
+            S: stride
+        """
+
+        # FPN-like
+        out = None
+        for i, x in enumerate(xs[::-1]):
+            stage_idx = len(xs) - i
+
+            # encode visible patches
+            encoder_linear_proj = getattr(self, f'encoder_linear_proj{stage_idx}')
+            encoded_visible_tokens = encoder_linear_proj(x)  # B x (V*G) x D
+
+            # upsample
+            if out is not None:
+                upsampled = getattr(self, f'upsampler{stage_idx}')(out)  # B x (V*G) x D
+                encoded_visible_tokens = encoded_visible_tokens + upsampled
+
+            out = getattr(self, f'output{stage_idx}')(encoded_visible_tokens)
+
+        # un-shuffle
+        B, VG, L = out.shape
+        G = VG // self.num_visible
+        mask_tokens = self.mask_token.expand(x.size(0), self.num_masked, G, -1)  # B x M x G x D
+        encoded_visible_tokens = encoded_visible_tokens.view(B, -1, G, L)  # B x V x G x D
+        all_tokens = torch.cat((encoded_visible_tokens, mask_tokens), dim=1)  # B x P x G x D
+        all_tokens = all_tokens[:, shuffle.argsort()]  # B x P x G x D
+        all_tokens = all_tokens.reshape(B, -1, L)  # B x (P*G) x D
+
+        # pos embedding
+        all_tokens = all_tokens + self.decoder_pos_embed
+
+        # decode all tokens
+        masked_inds = shuffle[self.num_visible:]
+        decoded_all_tokens = self.decoder_blocks(all_tokens)  # B x (P*G) x D
+        decoded_all_tokens = decoded_all_tokens.view(B, self.num_patches, -1, L)  # B x P x G x D
+        decoded_masked_tokens = decoded_all_tokens[:, masked_inds] if self.num_masked > 0 else decoded_all_tokens  # B x M x G x D
+        decoded_masked_tokens = decoded_masked_tokens.reshape(B, -1, L)  # B x (M*G) x D
+        decoded_masked_tokens = self.decoder_norm(decoded_masked_tokens)  # B x (M*G) x D
+        decoded_masked_tokens = self.decoder_linear_proj(decoded_masked_tokens)  # B x (M*G) x S*S*C = B x (37*8*8) x (4*4*3)
+
+        return decoded_masked_tokens
+
+
 class PriT1(nn.Module):
     """
     Build a PyramidReconstructionImageTransformer (PriT) model with a encoder and encoder
@@ -498,6 +617,81 @@ class PriT2(nn.Module):
         # build decoder
         self.decoder = PriTDecoder2(self.encoder, decoder_dim=decoder_dim,
             decoder_depth=decoder_depth, decoder_num_heads=decoder_num_heads)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return (set('encoder.' + name for name in list(self.encoder.no_weight_decay())) |
+                set('decoder.' + name for name in list(self.decoder.no_weight_decay())))
+
+    def get_target(self, img, masked_inds=None) -> torch.Tensor:
+        B, C, H, W = img.shape
+        ES, S, P = self.encoder.stride, self.decoder.stride, self.num_patches
+        Ph, Pw = H // ES, W // ES
+        Gh = Gw = ES // S
+        target = img.view(B, C, Ph, Gh, S, Pw, Gw, S)  # BxCx7x1x32x7x1x32
+        target = target.permute([0, 2, 5, 3, 6, 4, 7, 1]).reshape(B, P, -1, C)  # BxPx(Gh*Gw*S*S)xC
+
+        if masked_inds is not None:
+            target = target[:, masked_inds]  # BxMx(Gh*Gw*S*S)xC
+
+        # patch normalize
+        if self.normalized_pixel:
+            mean = target.mean(dim=-2, keepdim=True)
+            std = target.std(dim=-2, keepdim=True)
+            target = (target - mean) / (std + 1e-6)
+
+        target = target.view(B, -1, S * S * C)  # Bx(M*G)x(S*S*C)
+        return target
+
+    def forward(self, x):
+        """
+            B: batch size
+            V: num_visible
+            M: num_masked
+            P: num_patches, P=V+M
+            G: grid_h * grid_w = Gh * Gw
+            D: decoder_dim
+            S: stride
+        """
+
+        # encode visible patches
+        # [Bx(V*8*8)xC1, Bx(V*4*4)xC2, Bx(V*2*2)xC3, Bx(V*1*1)xC4]
+        encoded_visible_patches_multi_stages, shuffle = self.encoder(x)
+
+        # decode
+        decoded_masked_tokens = self.decoder(encoded_visible_patches_multi_stages, shuffle)  # Bx(M*G)x(S*S*C)
+
+        # generate target
+        masked_target = self.get_target(x, masked_inds=shuffle[self.num_visible:])  # Bx(M*G)x(S*S*C)
+
+        return self.loss(decoded_masked_tokens, masked_target)
+
+    def loss(self, img, target):
+        return F.mse_loss(img, target)
+
+
+class PriT3(nn.Module):
+    """
+    Build a PyramidReconstructionImageTransformer (PriT) model with a encoder and encoder
+    """
+
+    def __init__(self, encoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8, normalized_pixel=True):
+        super().__init__()
+        self.normalized_pixel = normalized_pixel
+
+        # build encoder
+        self.encoder: PriTEncoder = encoder(pyramid_reconstruction=True)
+        self.num_patches = self.encoder.num_patches
+        self.num_visible = self.encoder.num_visible
+
+        # build decoder
+        self.decoder = PriTDecoder3(self.encoder, decoder_dim=decoder_dim,
+            decoder_depth=decoder_depth, decoder_num_heads=decoder_num_heads)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return (set('encoder.' + name for name in list(self.encoder.no_weight_decay())) |
+                set('decoder.' + name for name in list(self.decoder.no_weight_decay())))
 
     def get_target(self, img, masked_inds=None) -> torch.Tensor:
         B, C, H, W = img.shape
@@ -670,6 +864,33 @@ def pretrain_prit_local_small_c_patch16_224(decoder_dim, decoder_depth, decoder_
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
             blocks_type=('local', 'local', 'normal', 'normal'),
+            num_heads=6,
+            **kwargs,
+        ),
+        decoder_dim=decoder_dim,  # 192
+        decoder_depth=decoder_depth,  # 4
+        decoder_num_heads=decoder_num_heads,  # 3
+        normalized_pixel=normalized_pixel)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def pretrain_prit3_local_small_b_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    # 23.534112 M
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    normalized_pixel=kwargs.pop('normalized_pixel')
+    model = PriT3(
+        partial(
+            PriTEncoder,
+            img_size=224,
+            patch_size=4,
+            embed_dim=96,
+            strides=(1, 2, 2, 2),
+            depths=(2, 2, 7, 1),
+            dims=(96, 192, 384, 768),
+            blocks_type=('local', 'normal', 'normal', 'normal'),
             num_heads=6,
             **kwargs,
         ),
