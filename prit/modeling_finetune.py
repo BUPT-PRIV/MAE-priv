@@ -9,7 +9,9 @@ from torch.nn.modules.utils import _pair as to_2tuple
 from utils.layers import trunc_normal_
 from utils.registry import register_model
 
-from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output, LocalBlock
+from .layers import (PatchEmbed, PatchDownsample, PatchUpsample,
+                     Block, LocalBlock, SRBlock, 
+                     Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, _cfg
 
 
@@ -103,7 +105,8 @@ class PriT(nn.Module):
 
         _blocks ={
             "normal": Block,
-            "local": partial(LocalBlock, num_patches=self.num_patches),
+            "local": partial(LocalBlock, self.num_patches),
+            "spacial_reduction": partial(SRBlock, self.num_patches),
         }
         blocks = tuple(_blocks[b] for b in blocks_type)
 
@@ -274,6 +277,22 @@ def prit_local_small_c_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'local', 'normal', 'normal'),
+        num_heads=6,
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def prit_local_small_sr_patch16_224(pretrained=False, **kwargs):
+    model = PriT(
+        img_size=224,
+        patch_size=4,
+        embed_dim=96,
+        strides=(1, 2, 2, 2),
+        depths=(2, 2, 7, 1),
+        dims=(96, 192, 384, 768),
+        blocks_type=('spacial_reduction', 'normal', 'normal', 'normal'),
         num_heads=6,
         **kwargs)
     model.default_cfg = _cfg()

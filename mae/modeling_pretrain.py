@@ -326,7 +326,31 @@ class PretrainVisionTransformer(nn.Module):
 
 
 @register_model
+def pretrain_mae_tiny_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    """5M parameters"""
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    model = PretrainVisionTransformer(
+        img_size=224,
+        patch_size=16,
+        encoder_embed_dim=192,
+        encoder_depth=12,
+        encoder_num_heads=3,
+        encoder_num_classes=0,
+        decoder_embed_dim=decoder_dim,
+        decoder_depth=decoder_depth,
+        decoder_num_heads=decoder_num_heads,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
 def pretrain_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    """22M parameters"""
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
     model = PretrainVisionTransformer(
@@ -349,6 +373,7 @@ def pretrain_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
 
 @register_model
 def pretrain_mae_base_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    """86M parameters"""
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
     model = PretrainVisionTransformer(
@@ -371,6 +396,7 @@ def pretrain_mae_base_patch16_224(decoder_dim, decoder_depth, decoder_num_heads,
 
 @register_model
 def pretrain_mae_large_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    """304M parameters"""
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
     model = PretrainVisionTransformer(
@@ -378,6 +404,52 @@ def pretrain_mae_large_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
         patch_size=16,
         encoder_embed_dim=1024,
         encoder_depth=24,
+        encoder_num_heads=16,
+        encoder_num_classes=0,
+        decoder_embed_dim=decoder_dim,
+        decoder_depth=decoder_depth,
+        decoder_num_heads=decoder_num_heads,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def pretrain_mae_huge_patch14_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    """632M parameters"""
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    model = PretrainVisionTransformer(
+        img_size=224,
+        patch_size=14,
+        encoder_embed_dim=1280,
+        encoder_depth=32,
+        encoder_num_heads=16,
+        encoder_num_classes=0,
+        decoder_embed_dim=decoder_dim,
+        decoder_depth=decoder_depth,
+        decoder_num_heads=decoder_num_heads,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def pretrain_mae_giant_patch14_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    """1.6B parameters"""
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    model = PretrainVisionTransformer(
+        img_size=224,
+        patch_size=14,
+        encoder_embed_dim=1664,
+        encoder_depth=48,
         encoder_num_heads=16,
         encoder_num_classes=0,
         decoder_embed_dim=decoder_dim,

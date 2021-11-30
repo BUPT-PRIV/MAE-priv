@@ -9,7 +9,9 @@ from utils.layers import to_2tuple
 from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 
-from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output, LocalBlock
+from .layers import (PatchEmbed, PatchDownsample, PatchUpsample,
+                     Block, LocalBlock, SRBlock, 
+                     Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, print_number_of_params, _cfg
 
 
@@ -85,6 +87,7 @@ class PriTEncoder(nn.Module):
         self.dims = dims
         self.mask_ratio = mask_ratio
         self.pyramid_reconstruction = pyramid_reconstruction
+        self.blocks_type = blocks_type
         self.use_mean_pooling = use_mean_pooling
         self.use_cls_token = use_cls_token = not use_mean_pooling
 
@@ -110,7 +113,8 @@ class PriTEncoder(nn.Module):
 
         _blocks ={
             "normal": Block,
-            "local": partial(LocalBlock, num_patches=self.num_visible),
+            "local": partial(LocalBlock, self.num_visible),
+            "spacial_reduction": partial(SRBlock, self.num_visible),
         }
         blocks = tuple(_blocks[b] for b in blocks_type)
 
@@ -206,12 +210,12 @@ class PriTDecoder1(nn.Module):
 
     def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8):
         super().__init__()
-        stage_idx = encoder.num_layers  # 4
+        decoder_stage_idx = encoder.num_layers  # 4
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:decoder_stage_idx])  # 32 for stage4
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
-        num_features = encoder.dims[stage_idx - 1]
+        num_features = encoder.dims[decoder_stage_idx - 1]
         self.num_layers = encoder.num_layers  # 4
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
@@ -284,9 +288,9 @@ class PriTDecoder2(nn.Module):
 
     def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8):
         super().__init__()
-        stage_idx = 1
+        decoder_stage_idx = 1
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 4 for stage1
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:decoder_stage_idx])  # 4 for stage1
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 56 for stage1
         self.num_layers = encoder.num_layers  # 4
@@ -413,9 +417,9 @@ class PriTDecoder3(nn.Module):
 
     def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8):
         super().__init__()
-        stage_idx = 1
+        decoder_stage_idx = 1
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 4 for stage1
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:decoder_stage_idx])  # 4 for stage1
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 56 for stage1
         self.num_layers = encoder.num_layers  # 4
@@ -425,9 +429,16 @@ class PriTDecoder3(nn.Module):
         self.stride = stride
 
         # build encoder linear projection(s) and output attention(s)
-        for stage_idx, dim in enumerate(encoder.dims, 1):
+        _outputs = {
+            "normal": Output,
+            "local": partial(LocalOutput, self.num_visible),
+            "spacial_reduction": partial(SROutput, self.num_patches),
+        }
+        outputs = tuple(_outputs[t] for t in encoder.blocks_type)
+
+        for stage_idx, (dim, output) in enumerate(zip(encoder.dims, outputs), 1):
             setattr(self, f'encoder_linear_proj{stage_idx}', nn.Linear(dim, decoder_dim))
-            setattr(self, f'output{stage_idx}', Output(decoder_dim, decoder_num_heads))
+            setattr(self, f'output{stage_idx}', output(decoder_dim, decoder_num_heads))
 
         # build mask token
         self.mask_token = nn.Parameter(torch.zeros(1, 1, 1, decoder_dim))
@@ -442,7 +453,15 @@ class PriTDecoder3(nn.Module):
             out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
 
         # build decoder
-        self.decoder_blocks = encoder._build_blocks(decoder_dim, decoder_num_heads, decoder_depth)
+        _blocks ={
+            "normal": Block,
+            "local": partial(LocalBlock, self.num_patches),
+            "spacial_reduction": partial(SRBlock, self.num_patches),
+        }
+        block = encoder.blocks_type[decoder_stage_idx - 1]
+
+        self.decoder_blocks = encoder._build_blocks(
+            decoder_dim, decoder_num_heads, decoder_depth, block=block)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
@@ -864,6 +883,33 @@ def pretrain_prit_local_small_c_patch16_224(decoder_dim, decoder_depth, decoder_
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
             blocks_type=('local', 'local', 'normal', 'normal'),
+            num_heads=6,
+            **kwargs,
+        ),
+        decoder_dim=decoder_dim,  # 192
+        decoder_depth=decoder_depth,  # 4
+        decoder_num_heads=decoder_num_heads,  # 3
+        normalized_pixel=normalized_pixel)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def pretrain_prit_local_small_sr_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    #  M
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    normalized_pixel=kwargs.pop('normalized_pixel')
+    model = PriT1(
+        partial(
+            PriTEncoder,
+            img_size=224,
+            patch_size=4,
+            embed_dim=96,
+            strides=(1, 2, 2, 2),
+            depths=(2, 2, 7, 1),
+            dims=(96, 192, 384, 768),
+            blocks_type=('spacial_reduction', 'normal', 'normal', 'normal'),
             num_heads=6,
             **kwargs,
         ),
