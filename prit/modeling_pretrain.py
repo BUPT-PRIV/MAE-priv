@@ -9,7 +9,9 @@ from utils.layers import to_2tuple
 from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 
-from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output, LocalBlock, LocalOutput
+from .layers import (PatchEmbed, PatchDownsample, PatchUpsample,
+                     Block, LocalBlock, SRBlock, 
+                     Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, print_number_of_params, _cfg
 
 
@@ -112,6 +114,7 @@ class PriTEncoder(nn.Module):
         _blocks ={
             "normal": Block,
             "local": partial(LocalBlock, self.num_visible),
+            "spacial_reduction": partial(SRBlock, self.num_visible),
         }
         blocks = tuple(_blocks[b] for b in blocks_type)
 
@@ -429,6 +432,7 @@ class PriTDecoder3(nn.Module):
         _outputs = {
             "normal": Output,
             "local": partial(LocalOutput, self.num_visible),
+            "spacial_reduction": partial(SROutput, self.num_patches),
         }
         outputs = tuple(_outputs[t] for t in encoder.blocks_type)
 
@@ -449,8 +453,13 @@ class PriTDecoder3(nn.Module):
             out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
 
         # build decoder
-        block = partial(LocalBlock, self.num_patches) \
-            if encoder.blocks_type[decoder_stage_idx - 1] == 'local' else Block
+        _blocks ={
+            "normal": Block,
+            "local": partial(LocalBlock, self.num_patches),
+            "spacial_reduction": partial(SRBlock, self.num_patches),
+        }
+        block = encoder.blocks_type[decoder_stage_idx - 1]
+
         self.decoder_blocks = encoder._build_blocks(
             decoder_dim, decoder_num_heads, decoder_depth, block=block)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
@@ -874,6 +883,33 @@ def pretrain_prit_local_small_c_patch16_224(decoder_dim, decoder_depth, decoder_
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
             blocks_type=('local', 'local', 'normal', 'normal'),
+            num_heads=6,
+            **kwargs,
+        ),
+        decoder_dim=decoder_dim,  # 192
+        decoder_depth=decoder_depth,  # 4
+        decoder_num_heads=decoder_num_heads,  # 3
+        normalized_pixel=normalized_pixel)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def pretrain_prit_local_small_sr_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    #  M
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    normalized_pixel=kwargs.pop('normalized_pixel')
+    model = PriT1(
+        partial(
+            PriTEncoder,
+            img_size=224,
+            patch_size=4,
+            embed_dim=96,
+            strides=(1, 2, 2, 2),
+            depths=(2, 2, 7, 1),
+            dims=(96, 192, 384, 768),
+            blocks_type=('spacial_reduction', 'normal', 'normal', 'normal'),
             num_heads=6,
             **kwargs,
         ),
