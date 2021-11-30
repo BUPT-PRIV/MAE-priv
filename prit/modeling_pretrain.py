@@ -458,7 +458,7 @@ class PriTDecoder3(nn.Module):
             "local": partial(LocalBlock, self.num_patches),
             "spacial_reduction": partial(SRBlock, self.num_patches),
         }
-        block = encoder.blocks_type[decoder_stage_idx - 1]
+        block = _blocks[encoder.blocks_type[decoder_stage_idx - 1]]
 
         self.decoder_blocks = encoder._build_blocks(
             decoder_dim, decoder_num_heads, decoder_depth, block=block)
@@ -511,17 +511,18 @@ class PriTDecoder3(nn.Module):
 
             # encode visible patches
             encoder_linear_proj = getattr(self, f'encoder_linear_proj{stage_idx}')
-            encoded_visible_tokens = encoder_linear_proj(x)  # B x (V*G) x D
+            x = encoder_linear_proj(x)  # B x (V*G) x D
 
             # upsample
             if out is not None:
                 upsampled = getattr(self, f'upsampler{stage_idx}')(out)  # B x (V*G) x D
-                encoded_visible_tokens = encoded_visible_tokens + upsampled
+                x = x + upsampled
 
-            out = getattr(self, f'output{stage_idx}')(encoded_visible_tokens)
+            out = getattr(self, f'output{stage_idx}')(x)
+        encoded_visible_tokens = out
 
         # un-shuffle
-        B, VG, L = out.shape
+        B, VG, L = encoded_visible_tokens.shape
         G = VG // self.num_visible
         mask_tokens = self.mask_token.expand(x.size(0), self.num_masked, G, -1)  # B x M x G x D
         encoded_visible_tokens = encoded_visible_tokens.view(B, -1, G, L)  # B x V x G x D
