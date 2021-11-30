@@ -151,13 +151,13 @@ class PatchEmbed(nn.Module):
 
 
 class PatchDownsample(nn.Module):
-    def __init__(self, dim_in, dim_out, num_visible, stride=2,
+    def __init__(self, dim_in, dim_out, num_patches, stride=2,
                  norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cls_token=False):
         super().__init__()
 
         self.dim_in = dim_in
         self.dim_out = dim_out
-        self.num_visible = num_visible
+        self.num_patches = num_patches
         self.stride = stride
         self.with_cls_token = with_cls_token
 
@@ -176,7 +176,7 @@ class PatchDownsample(nn.Module):
             x_wo_cls_token = x[:, 1:] if self.with_cls_token else x
 
             B, VG, L = x_wo_cls_token.shape  # 12, G=8*8, 4x4, 2x2, 1x1
-            Gh = Gw = int((VG // self.num_visible) ** 0.5)
+            Gh = Gw = int((VG // self.num_patches) ** 0.5)
 
             # get grid-like patches
             x_wo_cls_token = x_wo_cls_token.permute(0, 2, 1)  # BxLxVG
@@ -196,19 +196,19 @@ class PatchDownsample(nn.Module):
 
 
 class PatchUpsample(nn.Module):
-    def __init__(self, num_visible, stride=2):
+    def __init__(self, num_patches, stride=2):
         super().__init__()
 
         if stride != 2:
             raise ValueError(stride)
 
-        self.num_visible = num_visible
+        self.num_patches = num_patches
         self.stride = stride
         self.upsampler = partial(F.interpolate, scale_factor=stride, mode='bilinear', align_corners=False)
 
     def forward(self, x):
         B, VG, L = x.shape
-        Gh = Gw = int((VG // self.num_visible) ** 0.5)
+        Gh = Gw = int((VG // self.num_patches) ** 0.5)
 
         x = x.permute(0, 2, 1)
         x = x.reshape(B, -1, Gh, Gw)
@@ -233,4 +233,17 @@ class Output(nn.Module):
 
     def forward(self, x):
         x = x + self.drop_path(self.attn(self.norm1(x)))
+        return x
+
+
+class LocalOutput(Output):
+    def __init__(self, num_patches, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.num_patches = num_patches
+
+    def forward(self, x):
+        B, N, L = x.shape
+        x = x.view(-1, N // self.num_patches, L)  # B*12 x 8*8 x L
+        x = x + self.drop_path(self.attn(self.norm1(x)))
+        x = x.view(B, N, L)
         return x

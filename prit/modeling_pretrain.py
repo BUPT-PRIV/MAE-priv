@@ -9,7 +9,7 @@ from utils.layers import to_2tuple
 from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 
-from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output, LocalBlock
+from .layers import Block, PatchEmbed, PatchDownsample, PatchUpsample, Output, LocalBlock, LocalOutput
 from .utils import build_2d_sincos_position_embedding, print_number_of_params, _cfg
 
 
@@ -85,6 +85,7 @@ class PriTEncoder(nn.Module):
         self.dims = dims
         self.mask_ratio = mask_ratio
         self.pyramid_reconstruction = pyramid_reconstruction
+        self.blocks_type = blocks_type
         self.use_mean_pooling = use_mean_pooling
         self.use_cls_token = use_cls_token = not use_mean_pooling
 
@@ -110,7 +111,7 @@ class PriTEncoder(nn.Module):
 
         _blocks ={
             "normal": Block,
-            "local": partial(LocalBlock, num_patches=self.num_visible),
+            "local": partial(LocalBlock, self.num_visible),
         }
         blocks = tuple(_blocks[b] for b in blocks_type)
 
@@ -425,9 +426,15 @@ class PriTDecoder3(nn.Module):
         self.stride = stride
 
         # build encoder linear projection(s) and output attention(s)
-        for stage_idx, dim in enumerate(encoder.dims, 1):
+        _outputs = {
+            "normal": Output,
+            "local": partial(LocalOutput, self.num_visible),
+        }
+        outputs = tuple(_outputs[t] for t in encoder.blocks_type)
+
+        for stage_idx, (dim, output) in enumerate(zip(encoder.dims, outputs), 1):
             setattr(self, f'encoder_linear_proj{stage_idx}', nn.Linear(dim, decoder_dim))
-            setattr(self, f'output{stage_idx}', Output(decoder_dim, decoder_num_heads))
+            setattr(self, f'output{stage_idx}', output(decoder_dim, decoder_num_heads))
 
         # build mask token
         self.mask_token = nn.Parameter(torch.zeros(1, 1, 1, decoder_dim))
@@ -442,7 +449,8 @@ class PriTDecoder3(nn.Module):
             out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
 
         # build decoder
-        self.decoder_blocks = encoder._build_blocks(decoder_dim, decoder_num_heads, decoder_depth)
+        self.decoder_blocks = encoder._build_blocks(
+            decoder_dim, decoder_num_heads, decoder_depth)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
