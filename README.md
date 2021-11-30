@@ -20,13 +20,13 @@ We support two representations for classification: **GAP** (Global Average Pooli
 
 ### ViT-Small
 
-| pretrain epoch | representation | accuracy | k-NN |                            config                            |                            weight                            |                             log                              |
-| :------------: | :------------: | :------: | :--: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|      100       |      GAP       |  76.58%  |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1FZ2ii8FtbO6TDIU9scEH85nVANOLQac1/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/1IuAqrz23PwaA1_B9bYYqD0P4cXAYf2ZE/view?usp=sharing) finetune |
-|      200       |      GAP       |    -     |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_200E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1ufbovFHqYhz78Usz01SQ3mNlL0NoqIjC/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/116tiw2HqXQxr4i0xU_ZRDa6IDLP3wvwy/view?usp=sharing) finetune |
-|      400       |      GAP       |  77.56%  |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1GEuNN4yYYkjnKJyh65GDoEfH5s1AOPYm/view?usp=sharing) [finetune](https://drive.google.com/file/d/1v7Iy_FtNpDK89aCsTkAOH3fGZixv_dVs/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1iBastCBVK6goDtjqXSILyuqtR0ppbCmo/view?usp=sharing) [finetune](https://drive.google.com/file/d/1T8titxifdMm55UOP7lkGc27g7UPj97Jh/view?usp=sharing) |
-|      800       |      GAP       |    -     |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_800E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1dmzysQ2phLcbNfrmuSdsK_I5ltokOVXk/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/17mPfUCclcCmWOmQneaNYTQQmYWl3T2U7/view?usp=sharing) finetune |
-|      1600      |      GAP       |    -     |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_1600E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) |                      pretrain finetune                       |                      pretrain finetune                       |
+| pretrain epoch | representation | accuracy | 10-NN |                            config                            |                            weight                            |                             log                              |
+| :------------: | :------------: | :------: | :---: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
+|      100       |      GAP       |  76.58%  |   -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1FZ2ii8FtbO6TDIU9scEH85nVANOLQac1/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/1IuAqrz23PwaA1_B9bYYqD0P4cXAYf2ZE/view?usp=sharing) finetune |
+|      200       |      GAP       |    -     |   -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_200E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1ufbovFHqYhz78Usz01SQ3mNlL0NoqIjC/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/116tiw2HqXQxr4i0xU_ZRDa6IDLP3wvwy/view?usp=sharing) finetune |
+|      400       |      GAP       |  77.56%  | 20.8  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1GEuNN4yYYkjnKJyh65GDoEfH5s1AOPYm/view?usp=sharing) [finetune](https://drive.google.com/file/d/1v7Iy_FtNpDK89aCsTkAOH3fGZixv_dVs/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1iBastCBVK6goDtjqXSILyuqtR0ppbCmo/view?usp=sharing) [finetune](https://drive.google.com/file/d/1T8titxifdMm55UOP7lkGc27g7UPj97Jh/view?usp=sharing) |
+|      800       |      GAP       |    -     |   -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_800E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1dmzysQ2phLcbNfrmuSdsK_I5ltokOVXk/view?usp=sharing) finetune | [pretrain](https://drive.google.com/file/d/17mPfUCclcCmWOmQneaNYTQQmYWl3T2U7/view?usp=sharing) finetune |
+|      1600      |      GAP       |    -     |   -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_1600E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) |                      pretrain finetune                       |                      pretrain finetune                       |
 
 - We finetune models by 50 epochs as default.
 - [Baidu Wangpan](https://pan.baidu.com/s/1zc2JI_oJUS5l0hHcMIQa7w) （2lt1）
@@ -83,6 +83,8 @@ sh run_finetune.sh \
 ```
 
 ### k-NN Evaluation of Pretrain Model
+
+If `finetune` is dir, all of checkpoints (`finetune/*.pth`) will be evaluated and results will be aggregated into `save_path/output.txt`.
 
 #### ViT-Small
 

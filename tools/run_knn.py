@@ -285,24 +285,59 @@ if __name__ == '__main__':
     print("\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items())))
     cudnn.benchmark = True
 
-    if args.load_path:
-        train_features = torch.load(os.path.join(args.load_path, "trainfeat.pth"))
-        test_features = torch.load(os.path.join(args.load_path, "testfeat.pth"))
-        train_labels = torch.load(os.path.join(args.load_path, "trainlabels.pth"))
-        test_labels = torch.load(os.path.join(args.load_path, "testlabels.pth"))
+    if os.path.isdir(args.finetune):
+        import glob
+        checkpoints = glob.glob(os.path.join(args.finetune, '*.pth'))
+        save_path = args.save_path
+
+        print(f'>> find {len(checkpoints)} checkpoints')
+        for ckpt in checkpoints:
+            args.finetune = ckpt
+            args.save_path = os.path.join(save_path, os.path.basename(ckpt)[:-4])
+            train_features, test_features, train_labels, test_labels = extract_feature_pipeline(args)
+
+            if utils.get_rank() == 0:
+                if args.use_cuda:
+                    train_features = train_features.cuda()
+                    test_features = test_features.cuda()
+                    train_labels = train_labels.cuda()
+                    test_labels = test_labels.cuda()
+                results = []
+                for k in args.nb_knn:
+                    top1, top5 = knn_classifier(train_features, train_labels, test_features, test_labels, k,
+                                                args.temperature)
+                    print(f"{k}-NN classifier result: Top1: {top1}, Top5: {top5}")
+                    results.append('\t'.join([str(i) for i in [k, top1, top5]]))
+
+                with open(os.path.join(save_path, 'output.txt'), 'a+', encoding='utf-8') as fp:
+                    results = '\n'.join(results)
+                    fp.write(f'>> {os.path.basename(ckpt)[:-4]}\n{results}\n')
     else:
-        # need to extract features !
-        train_features, test_features, train_labels, test_labels = extract_feature_pipeline(args)
+        if args.load_path:
+            train_features = torch.load(os.path.join(args.load_path, "trainfeat.pth"))
+            test_features = torch.load(os.path.join(args.load_path, "testfeat.pth"))
+            train_labels = torch.load(os.path.join(args.load_path, "trainlabels.pth"))
+            test_labels = torch.load(os.path.join(args.load_path, "testlabels.pth"))
+        else:
+            # need to extract features !
+            train_features, test_features, train_labels, test_labels = extract_feature_pipeline(args)
 
-    if utils.get_rank() == 0:
-        if args.use_cuda:
-            train_features = train_features.cuda()
-            test_features = test_features.cuda()
-            train_labels = train_labels.cuda()
-            test_labels = test_labels.cuda()
+        if utils.get_rank() == 0:
+            if args.use_cuda:
+                train_features = train_features.cuda()
+                test_features = test_features.cuda()
+                train_labels = train_labels.cuda()
+                test_labels = test_labels.cuda()
 
-        print("Features are ready!\nStart the k-NN classification.")
-        for k in args.nb_knn:
-            top1, top5 = knn_classifier(train_features, train_labels, test_features, test_labels, k, args.temperature)
-            print(f"{k}-NN classifier result: Top1: {top1}, Top5: {top5}")
+            print("Features are ready!\nStart the k-NN classification.")
+            results = []
+            for k in args.nb_knn:
+                top1, top5 = knn_classifier(train_features, train_labels, test_features, test_labels, k, args.temperature)
+                print(f"{k}-NN classifier result: Top1: {top1}, Top5: {top5}")
+                results.append('\t'.join([str(i) for i in [k, top1, top5]]))
+
+            with open(os.path.join(args.save_path, 'output.txt'), 'a+', encoding='utf-8') as fp:
+                results = '\n'.join(results)
+                fp.write(f'>> {os.path.basename(args.finetune)[:-4]}\n{results}\n')
+
     dist.barrier()
