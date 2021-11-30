@@ -207,12 +207,12 @@ class PriTDecoder1(nn.Module):
 
     def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8):
         super().__init__()
-        stage_idx = encoder.num_layers  # 4
+        decoder_stage_idx = encoder.num_layers  # 4
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 32 for stage4
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:decoder_stage_idx])  # 32 for stage4
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 7 for stage4
-        num_features = encoder.dims[stage_idx - 1]
+        num_features = encoder.dims[decoder_stage_idx - 1]
         self.num_layers = encoder.num_layers  # 4
         self.num_patches = encoder.num_patches  # 49
         self.num_visible = encoder.num_visible  # 12
@@ -285,9 +285,9 @@ class PriTDecoder2(nn.Module):
 
     def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8):
         super().__init__()
-        stage_idx = 1
+        decoder_stage_idx = 1
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 4 for stage1
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:decoder_stage_idx])  # 4 for stage1
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 56 for stage1
         self.num_layers = encoder.num_layers  # 4
@@ -414,9 +414,9 @@ class PriTDecoder3(nn.Module):
 
     def __init__(self, encoder: PriTEncoder, decoder_dim=512, decoder_depth=8, decoder_num_heads=8):
         super().__init__()
-        stage_idx = 1
+        decoder_stage_idx = 1
 
-        stride = encoder.patch_size * reduce(mul, encoder.strides[:stage_idx])  # 4 for stage1
+        stride = encoder.patch_size * reduce(mul, encoder.strides[:decoder_stage_idx])  # 4 for stage1
         img_size = encoder.img_size  # 224
         out_size = (img_size[0] // stride, img_size[1] // stride)  # 56 for stage1
         self.num_layers = encoder.num_layers  # 4
@@ -449,8 +449,10 @@ class PriTDecoder3(nn.Module):
             out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
 
         # build decoder
+        block = partial(LocalBlock, self.num_patches) \
+            if encoder.blocks_type[decoder_stage_idx - 1] == 'local' else Block
         self.decoder_blocks = encoder._build_blocks(
-            decoder_dim, decoder_num_heads, decoder_depth)
+            decoder_dim, decoder_num_heads, decoder_depth, block=block)
         self.decoder_norm = encoder.norm_layer(decoder_dim)
         self.decoder_linear_proj = nn.Linear(decoder_dim, stride ** 2 * 3)
 
