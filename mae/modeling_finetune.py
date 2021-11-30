@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from utils.layers import drop_path, to_2tuple, trunc_normal_
 from utils.registry import register_model
+from utils import LP_BatchNorm
 
 
 def _cfg(url='', **kwargs):
@@ -236,7 +237,7 @@ class VisionTransformer(nn.Module):
         self.lin_probe = lin_probe
 
         if lin_probe:
-            self.fc_norm = nn.BatchNorm1d(embed_dim, affine=False)
+            self.fc_norm = LP_BatchNorm(embed_dim, affine=False)
         else:
             if use_mean_pooling:
                 self.fc_norm = norm_layer(embed_dim)
@@ -299,7 +300,7 @@ class VisionTransformer(nn.Module):
         self.num_classes = num_classes
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-    def forward_features(self, x):
+    def forward_features(self, x, is_train=True):
         x = self.patch_embed(x)
         B, _, _ = x.size()
 
@@ -319,7 +320,10 @@ class VisionTransformer(nn.Module):
             x = x[:, 0]
 
         if self.fc_norm is not None:
-            return self.fc_norm(x)
+            if self.lin_probe:
+                return self.fc_norm(x, is_train=is_train)
+            else:
+                return self.fc_norm(x)
         else:
             return x
 

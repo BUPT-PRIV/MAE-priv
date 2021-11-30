@@ -306,12 +306,10 @@ def main(args, ds_init):
 
     model = create_model(
         args.model,
-        pretrained=False,
         num_classes=args.nb_classes,
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
         attn_drop_rate=args.attn_drop_rate,
-        drop_block_rate=None,
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
         lin_probe=False,
@@ -697,7 +695,7 @@ def evaluate(data_loader, model, device):
 
         # compute output
         with torch.cuda.amp.autocast():
-            output = model(images)
+            output = model(images, is_train=False)
             loss = criterion(output, target)
 
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
