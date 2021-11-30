@@ -652,3 +652,30 @@ def pretrain_prit_local_small_b_patch16_224(decoder_dim, decoder_depth, decoder_
         normalized_pixel=normalized_pixel)
     model.default_cfg = _cfg()
     return model
+
+
+@register_model
+def pretrain_prit_local_small_c_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+    # 23.534112 M
+    if decoder_num_heads is None:
+        decoder_num_heads = decoder_dim // 64
+    normalized_pixel=kwargs.pop('normalized_pixel')
+    model = PriT1(
+        partial(
+            PriTEncoder,
+            img_size=224,
+            patch_size=4,
+            embed_dim=96,
+            strides=(1, 2, 2, 2),
+            depths=(2, 2, 7, 1),
+            dims=(96, 192, 384, 768),
+            blocks_type=('local', 'local', 'normal', 'normal'),
+            num_heads=6,
+            **kwargs,
+        ),
+        decoder_dim=decoder_dim,  # 192
+        decoder_depth=decoder_depth,  # 4
+        decoder_num_heads=decoder_num_heads,  # 3
+        normalized_pixel=normalized_pixel)
+    model.default_cfg = _cfg()
+    return model
