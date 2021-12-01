@@ -327,8 +327,8 @@ class VisionTransformer(nn.Module):
         else:
             return x
 
-    def forward(self, x):
-        x = self.forward_features(x)
+    def forward(self, x, is_train=True):
+        x = self.forward_features(x, is_train)
         x = self.head(x)
         return x
 
