@@ -7,7 +7,7 @@ This is an unofficial PyTorch implementation of [Masked Autoencoders Are Scalabl
 
 ## TODO
 
-- [ ] visualization of reconstruction image
+- [x] visualization of reconstruction image
 - [x] linear probing
 - [x] k-NN classification
 - [ ] more results
@@ -98,6 +98,18 @@ sh run_knn.sh \
 	--data_path /path/to/data \
 	--finetune /path/to/pretrain/model \
 	--save_path /path/to/save/result
+```
+
+### Visualization of Restruction
+
+#### ViT-Small Pretrained by 400 Epochs.
+
+```shell
+python tools/run_mae_vis.py \
+	--config cfgs/pretrain/ViT-B_400E_Norm_GAP.yaml \
+	--save_path output/restruct/ \
+	--model_path /path/to/pretrain/model \
+	--img_path /path/to/image
 ```
 
 ### License

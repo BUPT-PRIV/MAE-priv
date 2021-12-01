@@ -294,7 +294,7 @@ class PretrainVisionTransformer(nn.Module):
         else:
             return F.mse_loss(x, y, reduction="mean")
 
-    def forward(self, x):
+    def forward(self, x, restruct=False):
         target = x
         B, C, H, W = target.size()
 
@@ -308,6 +308,9 @@ class PretrainVisionTransformer(nn.Module):
 
         # decode (encoded_visible_patches + mask_token)
         decoder_output = self.decoder(decoder_input)  # Bx(14*14)x512
+
+        if restruct:
+            return decoder_output, shuffle, self.visible_size
 
         # target
         target = target.view(
