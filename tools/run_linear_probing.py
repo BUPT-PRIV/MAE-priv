@@ -312,7 +312,7 @@ def main(args, ds_init):
         attn_drop_rate=args.attn_drop_rate,
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
-        lin_probe=False,
+        lin_probe=True,
     )
 
     # freeze all layers but the last fc
