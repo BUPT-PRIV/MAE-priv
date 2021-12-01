@@ -453,12 +453,13 @@ class PriTDecoder3(nn.Module):
             out_size[0], out_size[1], decoder_dim, grid_size=encoder.stride // stride)
 
         # build decoder
-        _blocks ={
-            "normal": Block,
-            "local": partial(LocalBlock, self.num_patches),
-            "spacial_reduction": partial(SRBlock, self.num_patches),
-        }
-        block = _blocks[encoder.blocks_type[decoder_stage_idx - 1]]
+        # _blocks ={
+        #     "normal": Block,
+        #     "local": partial(LocalBlock, self.num_patches),
+        #     "spacial_reduction": partial(SRBlock, self.num_patches),
+        # }
+        # block = _blocks[encoder.blocks_type[decoder_stage_idx - 1]]
+        block = Block
 
         self.decoder_blocks = encoder._build_blocks(
             decoder_dim, decoder_num_heads, decoder_depth, block=block)
