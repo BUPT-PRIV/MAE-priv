@@ -786,6 +786,7 @@ def pretrain_vit_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
     return model
 
 
+@register_model
 def pretrain_prit_local_small_GGGG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.534112 M
     if decoder_num_heads is None:
