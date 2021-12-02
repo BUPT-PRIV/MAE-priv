@@ -1,7 +1,7 @@
-output_dir: 'output/pretrain/small_baseline/prit_small_100e_patch16_224_GAP'
+output_dir: 'output/pretrain/small_baseline/prit_local_small_LLGG_100e_patch16_224_GAP'
 
 # Architecture
-model: pretrain_prit_small_patch16_224
+model: pretrain_prit_local_small_LLGG_patch16_224
 decoder_dim: 192
 decoder_depth: 4
 use_mean_pooling: True
@@ -15,7 +15,7 @@ lr: 0.00015 # base_lr = 1.5e-4, lr = base_lr * batch-size / 256
 warmup_lr: 0.000001 # 1e-6
 min_lr: 0.00001 # 1e-5
 warmup_epochs: 10
-batch_size: 128
+batch_size: 256
 hflip: 0.5
 
 # Wandb

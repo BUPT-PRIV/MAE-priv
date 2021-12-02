@@ -1,7 +1,7 @@
-output_dir: 'output/finetune/prit_small_b_patch16_224_GAP'
+output_dir: 'output/finetune/prit_small_GGGG_patch16_224_GAP'
 
 # Architecture
-model: prit_local_small_b_patch16_224
+model: prit_local_small_GGGG_patch16_224
 use_mean_pooling: True # not use cls-token
 
 # Train

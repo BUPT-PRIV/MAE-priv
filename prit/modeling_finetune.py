@@ -220,14 +220,14 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_small_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_GGGG_patch16_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
-        embed_dim=24,
+        embed_dim=96,
         strides=(1, 2, 2, 2),
-        depths=(2, 2, 6, 2),
-        dims=(24, 48, 96, 192),
+        depths=(2, 2, 7, 1),
+        dims=(96, 192, 384, 768),
         blocks_type=('normal', 'normal', 'normal', 'normal'),
         num_heads=6,
         **kwargs)
@@ -236,23 +236,7 @@ def prit_small_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_patch16_224(pretrained=False, **kwargs):
-    model = PriT(
-        img_size=224,
-        patch_size=4,
-        embed_dim=24,
-        strides=(1, 2, 2, 2),
-        depths=(2, 2, 6, 2),
-        dims=(24, 48, 96, 192),
-        blocks_type=('local', 'normal', 'normal', 'normal'),
-        num_heads=6,
-        **kwargs)
-    model.default_cfg = _cfg()
-    return model
-
-
-@register_model
-def prit_local_small_b_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_LGGG_patch16_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -268,7 +252,7 @@ def prit_local_small_b_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_c_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_LLGG_patch16_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -284,7 +268,39 @@ def prit_local_small_c_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_sr_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_LLLG_patch16_224(pretrained=False, **kwargs):
+    model = PriT(
+        img_size=224,
+        patch_size=4,
+        embed_dim=96,
+        strides=(1, 2, 2, 2),
+        depths=(2, 2, 7, 1),
+        dims=(96, 192, 384, 768),
+        blocks_type=('local', 'local', 'local', 'normal'),
+        num_heads=6,
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def prit_local_small_LLLL_patch16_224(pretrained=False, **kwargs):
+    model = PriT(
+        img_size=224,
+        patch_size=4,
+        embed_dim=96,
+        strides=(1, 2, 2, 2),
+        depths=(2, 2, 7, 1),
+        dims=(96, 192, 384, 768),
+        blocks_type=('local', 'local', 'local', 'local'),
+        num_heads=6,
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def prit_local_small_SrGGG_patch16_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,

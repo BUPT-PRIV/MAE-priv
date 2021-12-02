@@ -1,7 +1,7 @@
-output_dir: 'output/finetune/prit_small_patch16_224_GAP'
+output_dir: 'output/finetune/prit_small_LGGG_patch16_224_GAP'
 
 # Architecture
-model: prit_small_patch16_224
+model: prit_local_small_LGGG_patch16_224
 use_mean_pooling: True # not use cls-token
 
 # Train
@@ -9,8 +9,8 @@ epochs: 50
 opt: adamw
 weight_decay: 0.05
 warmup_epochs: 10
-batch_size: 4
-update_freq: 32
+batch_size: 32
+update_freq: 4
 dist_eval: True
 #reprob: 0.25
 
