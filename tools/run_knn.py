@@ -62,9 +62,6 @@ def extract_feature_pipeline(args):
         args.model,
         use_mean_pooling=args.use_mean_pooling,
     )
-    # del fc & fc_norm
-    model.fc_norm = None
-    model.head = nn.Identity()
 
     # load model
     checkpoint = torch.load(args.finetune, map_location='cpu')
@@ -117,7 +114,12 @@ def extract_feature_pipeline(args):
             new_pos_embed = torch.cat((extra_tokens, pos_tokens), dim=1)
             checkpoint_model['pos_embed'] = new_pos_embed
     utils.load_state_dict(model, checkpoint_model)
-    model.cuda()
+    # del fc & fc_norm
+    model.fc_norm = None
+    model.head = nn.Identity()
+
+    if args.use_cuda:
+        model.cuda()
     model.eval()
 
     # ============ extract features ... ============
