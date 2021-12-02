@@ -45,6 +45,7 @@ def get_args():
     parser.add_argument('--epochs', default=30, type=int)
     parser.add_argument('--update_freq', default=1, type=int)
     parser.add_argument('--save_ckpt_freq', default=20, type=int)
+    parser.add_argument('--cal_flops', default=False, action='store_true')
 
     # Model parameters
     parser.add_argument('--model', default='deit_base_patch16_224', type=str, metavar='MODEL',
@@ -313,6 +314,17 @@ def main(args, ds_init):
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
     )
+
+    if args.cal_flops:
+        from fvcore.nn import FlopCountAnalysis, flop_count_table, flop_count_str
+
+        input = torch.randn(1, 3, 224, 224)
+        flop = FlopCountAnalysis(model, input)
+        print(flop_count_table(flop, max_depth=4))
+        print(flop_count_str(flop))
+        print(flop.total())
+
+        exit()
 
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
