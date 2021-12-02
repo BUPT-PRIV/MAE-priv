@@ -13,15 +13,15 @@ class Mix_MAE(nn.Module):
         self.mode = mode
         self.alpha = alpha
         self.forward = mode_dict[mode]
-        self.mix = nn.Conv2d(3*num, 3, 1)
+        # self.mix = nn.Conv2d(3*num, 3, 1)
 
+    @torch.no_grad()
     def batch_mix(self, img):
         B = img.shape[0]
         mix_ind = torch.randperm(B)
         mix_img = img.clone()[mix_ind]
-        # x = self.alpha * img + (1 - self.alpha) * mix_img  # B, 3, 224, 224
+        x = self.alpha * img + (1 - self.alpha) * mix_img  # B, 3, 224, 224
         target = torch.cat([img, mix_img], dim=1)  # B, 6, 224, 224
-        x = self.mix(target)
         return x, target
 
     def pair_mix(self, x):

@@ -1,4 +1,4 @@
-output_dir: 'output/pretrain/mix_mae/base_mix_vit_small_400e_patch16_224_GAP'
+output_dir: 'output/pretrain/mix_mae/vit_small_800e_patch16_224_GAP'
 
 # Architecture
 model: mix_mae_small_patch16_224
@@ -11,7 +11,7 @@ mix_mode: 'batch'
 mix_alpha: 0.5
 
 # Train
-epochs: 400
+epochs: 800
 opt: adamw
 lr: 0.00015 # base_lr = 1.5e-4, lr = base_lr * batch-size / 256
 warmup_lr: 0.000001 # 1e-6
