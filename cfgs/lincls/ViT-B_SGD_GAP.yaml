@@ -1,7 +1,7 @@
 output_dir: 'output/lincls/vit_base_patch16_224_GAP'
 
 # Architecture
-model: vit_small_patch16_224
+model: vit_base_patch16_224
 use_mean_pooling: True # not use cls-token
 
 # Train
