@@ -72,7 +72,7 @@ sh run_pretrain.sh \
 
 ```sh
 sh run_finetune.sh \
-	--config cfgs/fintune/ViT-S_50E_GAP.yaml \
+	--config cfgs/finetune/ViT-S_50E_GAP.yaml \
 	--data_path /path/to/data \
 	--finetune /path/to/pretrain/model
 ```
@@ -83,7 +83,7 @@ According to paper, we have two training modes: SGD + 4096 batch-size and LARS +
 #### ViT-Small with 1-node (8-GPU, NVIDIA GeForce RTX 3090) training, 50epochs, SGD + batch-size 4096, GAP.
 ```sh
 sh run_lincls.sh \
-	--config cfgs/lincls/ViT-S_SGD_50E_GAP.yaml \
+	--config cfgs/lincls/ViT-S_SGD_GAP.yaml \
 	--data_path /path/to/data \
 	--finetune /path/to/pretrain/model
 ```
