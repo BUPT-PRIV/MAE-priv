@@ -313,3 +313,35 @@ def prit_local_small_SrGGG_patch16_224(pretrained=False, **kwargs):
         **kwargs)
     model.default_cfg = _cfg()
     return model
+
+
+@register_model
+def vit_base_patch16_224(pretrained=False, **kwargs):
+    model = PriT(
+        img_size=224,
+        patch_size=16,
+        embed_dim=768,
+        strides=[1],
+        depths=[12],
+        dims=[768],
+        blocks_type=['normal'],
+        num_heads=12,
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def prit_local_base_LGGG_patch16_224(pretrained=False, **kwargs):
+    model = PriT(
+        img_size=224,
+        patch_size=4,
+        embed_dim=192,
+        strides=(1, 2, 2, 2),
+        depths=(2, 2, 7, 1),
+        dims=(192, 384, 768, 1536),
+        blocks_type=('local', 'normal', 'normal', 'normal'),
+        num_heads=12,
+        **kwargs)
+    model.default_cfg = _cfg()
+    return model
