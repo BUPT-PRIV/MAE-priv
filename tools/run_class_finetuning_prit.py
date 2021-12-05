@@ -141,6 +141,8 @@ def get_args():
     parser.add_argument('--model_prefix', default='', type=str)
     parser.add_argument('--init_scale', default=0.001, type=float)
     parser.add_argument('--use_mean_pooling', default=False, type=bool)
+    parser.add_argument('--avg_pool_downsample', default=True, type=bool,
+                        help='use avg pooling for parch downsample. use conv if false.')
 
     # Dataset parameters
     parser.add_argument('--data_path', default='', type=str,
@@ -313,6 +315,7 @@ def main(args, ds_init):
         attn_drop_rate=args.attn_drop_rate,
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
+        avg_pool_downsample=args.avg_pool_downsample,
     )
 
     if args.cal_flops:

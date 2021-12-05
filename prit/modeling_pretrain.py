@@ -12,7 +12,7 @@ from utils.registry import register_model
 from .layers import (PatchEmbed, PatchDownsample, PatchUpsample,
                      Block, LocalBlock, SRBlock, 
                      Output, LocalOutput, SROutput)
-from .utils import build_2d_sincos_position_embedding, print_number_of_params, _cfg
+from .utils import build_2d_sincos_position_embedding, _cfg
 
 
 def trunc_normal_(tensor, mean=0., std=1.):
@@ -35,8 +35,8 @@ class PriTEncoder(nn.Module):
                  qk_scale=None, init_values=0.,
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
-                 blocks_type=('normal', 'normal', 'normal', 'normal'),
-                 mask_ratio=0.75, use_mean_pooling=True, pyramid_reconstruction=False):
+                 blocks_type=('normal', 'normal', 'normal', 'normal'), mask_ratio=0.75,
+                 avg_pool_downsample=True, use_mean_pooling=True, pyramid_reconstruction=False):
         """
         Args:
             img_size (int, tuple): input image size
@@ -59,6 +59,7 @@ class PriTEncoder(nn.Module):
             depths (tuple): depth of transformer for echo stage
             dims (tuple): dimension for echo stage
             mask_ratio (float): mask ratio
+            avg_pool_downsample (bool): use avg pool in patch downsample
             use_mean_pooling (bool): enable mean pool
             pyramid_reconstruction (bool): return pyramid features from stages
         """
@@ -122,15 +123,12 @@ class PriTEncoder(nn.Module):
         for i in range(self.num_layers):
             downsample = i > 0 and (strides[i] == 2 or dims[i - 1] != dims[i])
             self.add_module(f'stage{i + 1}', nn.Sequential(
-                PatchDownsample(dims[i - 1], dims[i], self.num_visible, stride=strides[i],
-                    norm_layer=norm_layer, with_cls_token=use_cls_token) if downsample else nn.Identity(),
+                PatchDownsample(dims[i - 1], dims[i], self.num_visible, stride=strides[i], norm_layer=norm_layer,
+                    avg_pool=avg_pool_downsample, with_cls_token=use_cls_token) if downsample else nn.Identity(),
                 self._build_blocks(dims[i], num_heads, depths[i],
                     dpr=[dpr.pop() for _ in range(depths[i])],
                     init_values=init_values, block=blocks[i]),
             ))
-            # print(f'stage{i + 1} ' + '#' * 100)
-            # print_number_of_params(getattr(self, f'stage{i + 1}')[0])  # PatchDownsample
-            # print_number_of_params(getattr(self, f'stage{i + 1}')[1])  # Block
 
         self.norm = norm_layer(self.num_features)
 
@@ -563,13 +561,6 @@ class PriT1(nn.Module):
         # build decoder
         self.decoder = PriTDecoder1(self.encoder, decoder_dim=decoder_dim,
             decoder_depth=decoder_depth, decoder_num_heads=decoder_num_heads)
-
-        # print(f'PriT Encoder ' + '#' * 100)
-        # print_number_of_params(self.encoder)
-        # print(f'PriT Decoder ' + '#' * 100)
-        # print_number_of_params(self.decoder)
-        # print(f'PriT ' + '#' * 100)
-        # print_number_of_params(self)
 
     @torch.jit.ignore
     def no_weight_decay(self):

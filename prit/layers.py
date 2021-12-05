@@ -237,7 +237,8 @@ class PatchEmbed(nn.Module):
 
 class PatchDownsample(nn.Module):
     def __init__(self, dim_in, dim_out, num_patches, stride=2,
-                 norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cls_token=False):
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6),
+                 avg_pool=True, with_cls_token=False):
         super().__init__()
 
         self.dim_in = dim_in
@@ -249,29 +250,34 @@ class PatchDownsample(nn.Module):
         if stride == 1:
             self.pool = None
         elif stride == 2:
-            self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
+            self.pool = nn.AvgPool2d(2, stride=2) \
+                if avg_pool else nn.Conv2d(dim_in, dim_out, 2, stride=2)
         else:
             raise ValueError(stride)
 
-        self.reduction = nn.Linear(dim_in, dim_out, bias=False)
+        self.reduction = nn.Linear(dim_in, dim_out, bias=False) \
+            if avg_pool or (self.pool is None and dim_in != dim_out) else nn.Identity()
         self.norm = norm_layer(dim_out)
 
     def forward(self, x):
         if self.pool is not None:
             x_wo_cls_token = x[:, 1:] if self.with_cls_token else x
 
-            B, VG, L = x_wo_cls_token.shape  # 12, G=8*8, 4x4, 2x2, 1x1
-            Gh = Gw = int((VG // self.num_patches) ** 0.5)
+            B, PG, L = x_wo_cls_token.shape  # 12, G=8*8, 4x4, 2x2, 1x1
+            Gh = Gw = int((PG // self.num_patches) ** 0.5)
 
             # get grid-like patches
-            x_wo_cls_token = x_wo_cls_token.permute(0, 2, 1)  # BxLxVG
-            x_wo_cls_token = x_wo_cls_token.reshape(B, -1, Gh, Gw)  # Bx(L*V)xGhxGw
+            x_wo_cls_token = x_wo_cls_token.reshape(B, self.num_patches, -1, L)  # BxPxGxL
+            x_wo_cls_token = x_wo_cls_token.permute(0, 1, 3, 2)  # BxPxLxG
+            x_wo_cls_token = x_wo_cls_token.reshape(-1, L, Gh, Gw)  # (B*P)xLxGhxGw
 
-            x_wo_cls_token = self.pool(x_wo_cls_token)  # Bx(LxV)x Gh/2 x Gw/2
+            x_wo_cls_token = self.pool(x_wo_cls_token)  # (B*P)xLx(Gh/2)x(Gw/2)
 
             # reshape
-            x_wo_cls_token = x_wo_cls_token.view(B, L, -1)  # BxLx(VG/4)
-            x_wo_cls_token = x_wo_cls_token.permute(0, 2, 1)  # Bx(VG/4)xL
+            C = x_wo_cls_token.size(1)
+            x_wo_cls_token = x_wo_cls_token.reshape(B, self.num_patches, C, -1)  # BxPxCx(G/4)
+            x_wo_cls_token = x_wo_cls_token.permute(0, 1, 3, 2)  # BxPx(G/4)xC
+            x_wo_cls_token = x_wo_cls_token.reshape(B, -1, C)  # Bx(P*G/4)xC
 
             x = torch.cat((x[:, [0]], x_wo_cls_token), dim=1) if self.with_cls_token else x_wo_cls_token
 

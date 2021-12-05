@@ -60,6 +60,8 @@ def get_args():
                         help='normalized the target patch pixels')
     parser.add_argument('--use_mean_pooling', default=False, type=bool,
                         help='use mean pooling for classification. use cls-token if false.')
+    parser.add_argument('--avg_pool_downsample', default=True, type=bool,
+                        help='use avg pooling for parch downsample. use conv if false.')
 
     # Optimizer parameters
     parser.add_argument('--opt', default='adamw', type=str, metavar='OPTIMIZER',
@@ -160,6 +162,7 @@ def get_model(args):
         normalized_pixel=args.normlize_target,
         use_mean_pooling=args.use_mean_pooling,
         mask_ratio=args.mask_ratio,
+        avg_pool_downsample=args.avg_pool_downsample,
     )
 
     if args.cal_flops:
