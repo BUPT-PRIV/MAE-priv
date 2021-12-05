@@ -1,11 +1,11 @@
-output_dir: 'output/finetune/prit_base_LGGG_patch16_224_GAP'
+output_dir: 'output/finetune/prit_base_LLGG_patch16_224_GAP'
 
 # Architecture
-model: prit_local_base_LGGG_patch16_224
+model: prit_local_base_LLGG_patch16_224
 use_mean_pooling: True # not use cls-token
 
 # Train
-epochs: 50
+epochs: 100
 opt: adamw
 weight_decay: 0.05
 warmup_epochs: 10
