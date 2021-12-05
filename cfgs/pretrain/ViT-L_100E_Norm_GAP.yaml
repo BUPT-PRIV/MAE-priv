@@ -1,4 +1,4 @@
-output_dir: 'output/pretrain/vit_small_patch16_224_GAP'
+output_dir: 'output/pretrain/vit_large_patch16_224_GAP'
 
 # Architecture
 model: pretrain_mae_large_patch16_224
