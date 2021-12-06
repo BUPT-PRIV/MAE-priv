@@ -1,9 +1,9 @@
-output_dir: 'output/finetune/prit_small_LGGG_patch16_224_GAP_conv_ds'
+output_dir: 'output/finetune/prit_small_LGGG_patch16_224_GAP_patch_flatten'
 
 # Architecture
 model: prit_local_small_LGGG_patch16_224
 use_mean_pooling: True # not use cls-token
-avg_pool_downsample: False
+patch_downsample: flatten
 
 # Train
 epochs: 50

@@ -9,7 +9,7 @@ from torch.nn.modules.utils import _pair as to_2tuple
 from utils.layers import trunc_normal_
 from utils.registry import register_model
 
-from .layers import (PatchEmbed, PatchDownsample, PatchUpsample,
+from .layers import (PatchEmbed, PatchPool, PatchConv, PatchFlatten, PatchUpsample,
                      Block, LocalBlock, SRBlock, 
                      Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, _cfg
@@ -32,7 +32,7 @@ class PriT(nn.Module):
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
                  num_heads=(12, 12, 12, 12), blocks_type=('normal', 'normal', 'normal', 'normal'),
-                 avg_pool_downsample=True, use_mean_pooling=True, pyramid_reconstruction=False):
+                 patch_downsample='pool', use_mean_pooling=True, pyramid_reconstruction=False):
         """
         Args:
             img_size (int, tuple): input image size
@@ -55,7 +55,7 @@ class PriT(nn.Module):
             depths (tuple): depth of transformer for echo stage
             dims (tuple): dimension for echo stage
             init_scale (float): init scale of head
-            avg_pool_downsample (bool): use avg pool in patch downsample
+            patch_downsample (str): patch downsample method
             use_mean_pooling (bool): enable mean pool
             pyramid_reconstruction (bool): return pyramid features from stages
         """
@@ -111,14 +111,20 @@ class PriT(nn.Module):
         }
         blocks = tuple(_blocks[b] for b in blocks_type)
 
-        dpr = [x.item() for x in torch.linspace(drop_path_rate, 0, sum(depths))]  # stochastic depth decay rule
+        patch_downsample = {
+            "pool": PatchPool,
+            "conv": PatchConv,
+            "flatten": PatchFlatten,
+        }[patch_downsample]
+
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
         for i in range(self.num_layers):
             downsample = i > 0 and (strides[i] == 2 or dims[i - 1] != dims[i])
             self.add_module(f'stage{i + 1}', nn.Sequential(
-                PatchDownsample(dims[i - 1], dims[i], self.num_patches, stride=strides[i], norm_layer=norm_layer,
-                    avg_pool=avg_pool_downsample, with_cls_token=use_cls_token) if downsample else nn.Identity(),
-                self._build_blocks(dims[i], num_heads, depths[i],
-                    dpr=[dpr.pop() for _ in range(depths[i])],
+                patch_downsample(dims[i - 1], dims[i], self.num_patches, stride=strides[i],
+                    norm_layer=norm_layer, with_cls_token=use_cls_token) if downsample else nn.Identity(),
+                self._build_blocks(dims[i], num_heads[i], depths[i],
+                    dpr=[dpr.pop(0) for _ in range(depths[i])],
                     init_values=init_values, block=blocks[i]),
             ))
         self.norm = norm_layer(self.num_features) if use_cls_token else nn.Identity()
