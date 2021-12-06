@@ -7,7 +7,7 @@ decoder_depth: 4
 use_mean_pooling: True
 normlize_target: True
 mask_ratio: 0.75
-mix_mode: 'batch'
+mix_mode: 'base'
 mix_alpha: 0.5
 
 # Train

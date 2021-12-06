@@ -61,7 +61,7 @@ def get_args():
                         help='use mean pooling for classification. use cls-token if false.')
 
     # Mix parameters
-    parser.add_argument('--mix_mode', default='batch', type=str,
+    parser.add_argument('--mix_mode', default='base', type=str,
                         help='mix mode')
     parser.add_argument('--mix_alpha', default=0.5, type=float,
                         help='mix_alpha')

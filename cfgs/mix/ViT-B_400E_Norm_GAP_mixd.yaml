@@ -1,13 +1,13 @@
 output_dir: 'output/pretrain/mix_mae/base_mix_vit_small_400e_patch16_224_GAP'
 
 # Architecture
-model: mix_mae_small_patch16_224
-decoder_dim: 192
+model: mix_mae_base_patch16_224
+decoder_dim: 384
 decoder_depth: 4
 use_mean_pooling: True
 normlize_target: True
 mask_ratio: 0.75
-mix_mode: 'base'
+mix_mode: 'decoder'
 mix_alpha: 0.5
 
 # Train
