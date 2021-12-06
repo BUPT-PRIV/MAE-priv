@@ -1,4 +1,4 @@
-output_dir: 'output/pretrain/mix_mae/base_mix_vit_small_400e_patch16_224_GAP'
+output_dir: 'output/pretrain/mix_mae/decoder_mix_vit_base_400e_patch16_224_GAP'
 
 # Architecture
 model: mix_mae_base_patch16_224
