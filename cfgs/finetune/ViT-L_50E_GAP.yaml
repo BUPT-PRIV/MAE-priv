@@ -3,6 +3,7 @@ output_dir: 'output/finetune/vit_large_patch16_224_GAP'
 # Architecture
 model: vit_large_patch16_224
 use_mean_pooling: True # not use cls-token
+drop_path: 0.1
 
 # Train
 epochs: 50
