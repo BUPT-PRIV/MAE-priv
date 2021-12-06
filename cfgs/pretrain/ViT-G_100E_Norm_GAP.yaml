@@ -1,7 +1,7 @@
 output_dir: 'output/pretrain/vit_giant_patch16_224_GAP'
 
 # Architecture
-model: pretrain_mae_giant_patch16_224
+model: pretrain_mae_giant_patch14_224
 decoder_dim: 512
 decoder_depth: 8
 use_mean_pooling: True # not use cls-token
