@@ -23,15 +23,15 @@ class PriT(nn.Module):
     def __init__(self,
                  # args for ViT (timm)
                  # w/o `distilled`, `detph`, `representation_size` and `weight_init`.
-                 # default value of `patch_size` and `embed_dim` changed.
+                 # default value of `patch_size`, `num_heads` and `embed_dim` changed.
                  img_size=224, patch_size=4, in_chans=3, num_classes=1000, embed_dim=96,
-                 num_heads=12, mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0.,
+                 mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., embed_layer=PatchEmbed, norm_layer=None, act_layer=None,
                  # more args for ViT (BeiT)
                  qk_scale=None, init_values=0., init_scale=0.,
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
-                 blocks_type=('normal', 'normal', 'normal', 'normal'),
+                 num_heads=(12, 12, 12, 12), blocks_type=('normal', 'normal', 'normal', 'normal'),
                  avg_pool_downsample=True, use_mean_pooling=True, pyramid_reconstruction=False):
         """
         Args:
@@ -214,7 +214,7 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
         depths=[12],
         dims=[384],
         blocks_type=['normal'],
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or [6],
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -230,7 +230,7 @@ def prit_local_small_GGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('normal', 'normal', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -246,7 +246,7 @@ def prit_local_small_LGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'normal', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -262,7 +262,7 @@ def prit_local_small_LLGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'local', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -278,7 +278,7 @@ def prit_local_small_LLLG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'local', 'local', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -294,7 +294,7 @@ def prit_local_small_LLLL_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'local', 'local', 'local'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -310,7 +310,7 @@ def prit_local_small_SrGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('spacial_reduction', 'normal', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -326,7 +326,7 @@ def vit_base_patch16_224(pretrained=False, **kwargs):
         depths=[12],
         dims=[768],
         blocks_type=['normal'],
-        num_heads=12,
+        num_heads=kwargs.pop('num_heads') or [12],
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -342,7 +342,7 @@ def prit_local_base_LGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(192, 384, 768, 1536),
         blocks_type=('local', 'normal', 'normal', 'normal'),
-        num_heads=12,
+        num_heads=kwargs.pop('num_heads') or (12, 12, 12, 12),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -358,7 +358,7 @@ def prit_local_base_LLGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(192, 384, 768, 1536),
         blocks_type=('local', 'local', 'normal', 'normal'),
-        num_heads=12,
+        num_heads=kwargs.pop('num_heads') or (12, 12, 12, 12),
         **kwargs)
     model.default_cfg = _cfg()
     return model
