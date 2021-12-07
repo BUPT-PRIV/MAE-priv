@@ -104,7 +104,10 @@ def auto_load_model(args, model, model_without_ddp, optimizer, loss_scaler, mode
                 t = ckpt.split('-')[-1].split('.')[0]
                 if t.isdigit():
                     latest_ckpt = max(int(t), latest_ckpt)
-            if latest_ckpt >= 0:
+                elif t == 'latest':
+                    latest_ckpt = 'latest'
+                    break
+            if latest_ckpt != -1:
                 args.resume = os.path.join(output_dir, 'checkpoint-%d.pth' % latest_ckpt)
             print("Auto resume checkpoint: %s" % args.resume)
 
