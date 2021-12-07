@@ -9,7 +9,7 @@ from torch.nn.modules.utils import _pair as to_2tuple
 from utils.layers import trunc_normal_
 from utils.registry import register_model
 
-from .layers import (PatchEmbed, PatchDownsample, PatchUpsample,
+from .layers import (PatchEmbed, PatchPool, PatchConv, PatchFlatten, PatchUpsample,
                      Block, LocalBlock, SRBlock, 
                      Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, _cfg
@@ -23,16 +23,16 @@ class PriT(nn.Module):
     def __init__(self,
                  # args for ViT (timm)
                  # w/o `distilled`, `detph`, `representation_size` and `weight_init`.
-                 # default value of `patch_size` and `embed_dim` changed.
+                 # default value of `patch_size`, `num_heads` and `embed_dim` changed.
                  img_size=224, patch_size=4, in_chans=3, num_classes=1000, embed_dim=96,
-                 num_heads=12, mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0.,
+                 mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., embed_layer=PatchEmbed, norm_layer=None, act_layer=None,
                  # more args for ViT (BeiT)
                  qk_scale=None, init_values=0., init_scale=0.,
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
-                 blocks_type=('normal', 'normal', 'normal', 'normal'),
-                 avg_pool_downsample=True, use_mean_pooling=True, pyramid_reconstruction=False):
+                 num_heads=(12, 12, 12, 12), blocks_type=('normal', 'normal', 'normal', 'normal'),
+                 patch_downsample='pool', use_mean_pooling=True, pyramid_reconstruction=False):
         """
         Args:
             img_size (int, tuple): input image size
@@ -55,7 +55,7 @@ class PriT(nn.Module):
             depths (tuple): depth of transformer for echo stage
             dims (tuple): dimension for echo stage
             init_scale (float): init scale of head
-            avg_pool_downsample (bool): use avg pool in patch downsample
+            patch_downsample (str): patch downsample method
             use_mean_pooling (bool): enable mean pool
             pyramid_reconstruction (bool): return pyramid features from stages
         """
@@ -111,14 +111,20 @@ class PriT(nn.Module):
         }
         blocks = tuple(_blocks[b] for b in blocks_type)
 
-        dpr = [x.item() for x in torch.linspace(drop_path_rate, 0, sum(depths))]  # stochastic depth decay rule
+        patch_downsample = {
+            "pool": PatchPool,
+            "conv": PatchConv,
+            "flatten": PatchFlatten,
+        }[patch_downsample]
+
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
         for i in range(self.num_layers):
             downsample = i > 0 and (strides[i] == 2 or dims[i - 1] != dims[i])
             self.add_module(f'stage{i + 1}', nn.Sequential(
-                PatchDownsample(dims[i - 1], dims[i], self.num_patches, stride=strides[i], norm_layer=norm_layer,
-                    avg_pool=avg_pool_downsample, with_cls_token=use_cls_token) if downsample else nn.Identity(),
-                self._build_blocks(dims[i], num_heads, depths[i],
-                    dpr=[dpr.pop() for _ in range(depths[i])],
+                patch_downsample(dims[i - 1], dims[i], self.num_patches, stride=strides[i],
+                    norm_layer=norm_layer, with_cls_token=use_cls_token) if downsample else nn.Identity(),
+                self._build_blocks(dims[i], num_heads[i], depths[i],
+                    dpr=[dpr.pop(0) for _ in range(depths[i])],
                     init_values=init_values, block=blocks[i]),
             ))
         self.norm = norm_layer(self.num_features) if use_cls_token else nn.Identity()
@@ -214,7 +220,7 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
         depths=[12],
         dims=[384],
         blocks_type=['normal'],
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or [6],
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -230,7 +236,7 @@ def prit_local_small_GGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('normal', 'normal', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -246,7 +252,7 @@ def prit_local_small_LGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'normal', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -262,7 +268,7 @@ def prit_local_small_LLGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'local', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -278,7 +284,7 @@ def prit_local_small_LLLG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'local', 'local', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -294,7 +300,7 @@ def prit_local_small_LLLL_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('local', 'local', 'local', 'local'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -310,7 +316,7 @@ def prit_local_small_SrGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(96, 192, 384, 768),
         blocks_type=('spacial_reduction', 'normal', 'normal', 'normal'),
-        num_heads=6,
+        num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -326,7 +332,7 @@ def vit_base_patch16_224(pretrained=False, **kwargs):
         depths=[12],
         dims=[768],
         blocks_type=['normal'],
-        num_heads=12,
+        num_heads=kwargs.pop('num_heads') or [12],
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -342,7 +348,7 @@ def prit_local_base_LGGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(192, 384, 768, 1536),
         blocks_type=('local', 'normal', 'normal', 'normal'),
-        num_heads=12,
+        num_heads=kwargs.pop('num_heads') or (12, 12, 12, 12),
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -358,7 +364,7 @@ def prit_local_base_LLGG_patch16_224(pretrained=False, **kwargs):
         depths=(2, 2, 7, 1),
         dims=(192, 384, 768, 1536),
         blocks_type=('local', 'local', 'normal', 'normal'),
-        num_heads=12,
+        num_heads=kwargs.pop('num_heads') or (12, 12, 12, 12),
         **kwargs)
     model.default_cfg = _cfg()
     return model

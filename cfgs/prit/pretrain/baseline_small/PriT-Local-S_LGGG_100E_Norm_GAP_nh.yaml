@@ -1,4 +1,4 @@
-output_dir: 'output/pretrain/small_baseline/prit_local_small_LGGG_100e_patch16_224_GAP_conv_ds'
+output_dir: 'output/pretrain/small_baseline/prit_local_small_LGGG_100e_patch16_224_GAP_num_heads'
 
 # Architecture
 model: pretrain_prit_local_small_LGGG_patch16_224
@@ -7,7 +7,7 @@ decoder_depth: 4
 use_mean_pooling: True
 normlize_target: True
 mask_ratio: 0.75
-avg_pool_downsample: False
+num_heads: [2, 3, 6, 12]
 
 # Train
 epochs: 100

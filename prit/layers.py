@@ -235,10 +235,9 @@ class PatchEmbed(nn.Module):
         return x
 
 
-class PatchDownsample(nn.Module):
+class PatchPool(nn.Module):
     def __init__(self, dim_in, dim_out, num_patches, stride=2,
-                 norm_layer=partial(nn.LayerNorm, eps=1e-6),
-                 avg_pool=True, with_cls_token=False):
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cls_token=False):
         super().__init__()
 
         self.dim_in = dim_in
@@ -250,13 +249,11 @@ class PatchDownsample(nn.Module):
         if stride == 1:
             self.pool = None
         elif stride == 2:
-            self.pool = nn.AvgPool2d(2, stride=2) \
-                if avg_pool else nn.Conv2d(dim_in, dim_out, 2, stride=2)
+            self.pool = nn.AvgPool2d(2, stride=2)
         else:
             raise ValueError(stride)
 
-        self.reduction = nn.Linear(dim_in, dim_out, bias=False) \
-            if avg_pool or (self.pool is None and dim_in != dim_out) else nn.Identity()
+        self.reduction = nn.Linear(dim_in, dim_out, bias=False)
         self.norm = norm_layer(dim_out)
 
     def forward(self, x):
@@ -278,6 +275,93 @@ class PatchDownsample(nn.Module):
             x_wo_cls_token = x_wo_cls_token.reshape(B, self.num_patches, C, -1)  # BxPxCx(G/4)
             x_wo_cls_token = x_wo_cls_token.permute(0, 1, 3, 2)  # BxPx(G/4)xC
             x_wo_cls_token = x_wo_cls_token.reshape(B, -1, C)  # Bx(P*G/4)xC
+
+            x = torch.cat((x[:, [0]], x_wo_cls_token), dim=1) if self.with_cls_token else x_wo_cls_token
+
+        x = self.reduction(x)
+        x = self.norm(x)
+        return x
+
+
+class PatchConv(nn.Module):
+    def __init__(self, dim_in, dim_out, num_patches, stride=2,
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cls_token=False):
+        super().__init__()
+
+        self.dim_in = dim_in
+        self.dim_out = dim_out
+        self.num_patches = num_patches
+        self.stride = stride
+        self.with_cls_token = with_cls_token
+
+        if stride == 1:
+            self.pool = None
+        elif stride == 2:
+            self.pool = nn.Conv2d(dim_in, dim_out, 2, stride=2)
+        else:
+            raise ValueError(stride)
+
+        self.reduction = nn.Identity()
+        self.norm = norm_layer(dim_out)
+
+    def forward(self, x):
+        if self.pool is not None:
+            x_wo_cls_token = x[:, 1:] if self.with_cls_token else x
+
+            B, PG, L = x_wo_cls_token.shape  # 12, G=8*8, 4x4, 2x2, 1x1
+            Gh = Gw = int((PG // self.num_patches) ** 0.5)
+
+            # get grid-like patches
+            x_wo_cls_token = x_wo_cls_token.reshape(B, self.num_patches, -1, L)  # BxPxGxL
+            x_wo_cls_token = x_wo_cls_token.permute(0, 1, 3, 2)  # BxPxLxG
+            x_wo_cls_token = x_wo_cls_token.reshape(-1, L, Gh, Gw)  # (B*P)xLxGhxGw
+
+            x_wo_cls_token = self.pool(x_wo_cls_token)  # (B*P)xLx(Gh/2)x(Gw/2)
+
+            # reshape
+            C = x_wo_cls_token.size(1)
+            x_wo_cls_token = x_wo_cls_token.reshape(B, self.num_patches, C, -1)  # BxPxCx(G/4)
+            x_wo_cls_token = x_wo_cls_token.permute(0, 1, 3, 2)  # BxPx(G/4)xC
+            x_wo_cls_token = x_wo_cls_token.reshape(B, -1, C)  # Bx(P*G/4)xC
+
+            x = torch.cat((x[:, [0]], x_wo_cls_token), dim=1) if self.with_cls_token else x_wo_cls_token
+
+        x = self.reduction(x)
+        x = self.norm(x)
+        return x
+
+
+class PatchFlatten(nn.Module):
+    def __init__(self, dim_in, dim_out, num_patches, stride=2,
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6), with_cls_token=False):
+        super().__init__()
+
+        self.dim_in = dim_in
+        self.dim_out = dim_out
+        self.num_patches = num_patches
+        self.stride = stride
+        self.with_cls_token = with_cls_token
+
+        if stride == 1:
+            self.pool = None
+        elif stride == 2:
+            self.pool = nn.Identity()
+        else:
+            raise ValueError(stride)
+
+        self.reduction = nn.Linear(dim_in * 4, dim_out, bias=False)
+        self.norm = norm_layer(dim_out)
+
+    def forward(self, x):
+        if self.pool is not None:
+            x_wo_cls_token = x[:, 1:] if self.with_cls_token else x
+
+            B, PG, L = x_wo_cls_token.shape  # 12, G=8*8, 4x4, 2x2, 1x1
+            Gh = Gw = int((PG // self.num_patches) ** 0.5)
+
+            x_wo_cls_token = x_wo_cls_token.reshape(B, -1, Gh // 2, 2, Gw // 2, 2, L)  # BxPx(Gh/2)x2x(Gw/2)x2xL
+            x_wo_cls_token = x_wo_cls_token.permute(0, 1, 2, 4, 3, 5, 6)  # BxPx(Gh/2)x(Gw/2)x2x2xL
+            x_wo_cls_token = x_wo_cls_token.reshape(B, -1, 4 * L)  # Bx(P*G/4)x(4*L)
 
             x = torch.cat((x[:, [0]], x_wo_cls_token), dim=1) if self.with_cls_token else x_wo_cls_token
 

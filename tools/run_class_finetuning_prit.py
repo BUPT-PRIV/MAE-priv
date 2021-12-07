@@ -53,6 +53,8 @@ def get_args():
 
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size')
+    parser.add_argument('--num_heads', default=None, type=list,
+                        help='num heads of echo stage.')
 
     parser.add_argument('--drop', type=float, default=0.0, metavar='PCT',
                         help='Dropout rate (default: 0.)')
@@ -141,8 +143,8 @@ def get_args():
     parser.add_argument('--model_prefix', default='', type=str)
     parser.add_argument('--init_scale', default=0.001, type=float)
     parser.add_argument('--use_mean_pooling', default=False, type=bool)
-    parser.add_argument('--avg_pool_downsample', default=True, type=bool,
-                        help='use avg pooling for parch downsample. use conv if false.')
+    parser.add_argument('--patch_downsample', default='pool', type=str, choices=['pool', 'conv', 'flatten'],
+                        help='parch downsample method.')
 
     # Dataset parameters
     parser.add_argument('--data_path', default='', type=str,
@@ -315,7 +317,8 @@ def main(args, ds_init):
         attn_drop_rate=args.attn_drop_rate,
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
-        avg_pool_downsample=args.avg_pool_downsample,
+        num_heads=aegs.num_heads,
+        patch_downsample=args.patch_downsample,
     )
 
     if args.cal_flops:
