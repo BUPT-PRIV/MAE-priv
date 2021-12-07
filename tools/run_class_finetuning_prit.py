@@ -317,7 +317,7 @@ def main(args, ds_init):
         attn_drop_rate=args.attn_drop_rate,
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
-        num_heads=aegs.num_heads,
+        num_heads=args.num_heads,
         patch_downsample=args.patch_downsample,
     )
 
