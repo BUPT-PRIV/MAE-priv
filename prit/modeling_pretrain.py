@@ -10,7 +10,7 @@ from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 
 from .layers import (PatchEmbed, PatchConv, PatchPool, PatchDWConv, PatchUpsample,
-                     Block, LocalBlock, SRBlock, 
+                     Block, LocalBlock, SRBlock, DilatedBlock,
                      Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, _cfg
 
@@ -112,12 +112,22 @@ class PriTEncoder(nn.Module):
             grid_h, grid_w, embed_dim, use_cls_token=use_cls_token)
         self.pos_drop = nn.Dropout(p=drop_rate)
 
-        _blocks ={
-            "normal": Block,
-            "local": partial(LocalBlock, self.num_visible),
-            "spacial_reduction": partial(SRBlock, self.num_visible),
-        }
-        blocks = tuple(_blocks[b] for b in blocks_type)
+        def get_block(name, stage_idx):
+            if name == 'dilated':
+                dilation = 8 // (2 ** stage_idx)
+                return partial(DilatedBlock, self.num_visible, dilation)
+            return {
+                "normal": Block,
+                "local": partial(LocalBlock, self.num_visible),
+                "spacial_reduction": partial(SRBlock, self.num_visible),
+            }[name]
+
+        blocks = []
+        for i, names in enumerate(blocks_type):
+            if isinstance(names, str):
+                names = [names] * depths[i]
+            assert isinstance(names, (tuple, list)) and len(names) == depths[i]
+            blocks += [get_block(name, i + 1) for name in names]
 
         patch_downsample = {
             "pool": PatchPool,
@@ -131,9 +141,9 @@ class PriTEncoder(nn.Module):
             self.add_module(f'stage{i + 1}', nn.Sequential(
                 patch_downsample(dims[i - 1], dims[i], self.num_visible, stride=strides[i],
                     norm_layer=norm_layer, with_cls_token=use_cls_token) if downsample else nn.Identity(),
-                self._build_blocks(dims[i], num_heads[i], depths[i],
+                self._build_blocks(dims[i], num_heads[i], depths[i], init_values=init_values,
                     dpr=[dpr.pop(0) for _ in range(depths[i])],
-                    init_values=init_values, block=blocks[i]),
+                    block=[blocks.pop(0) for _ in range(depths[i])]),
             ))
 
         self.norm = norm_layer(self.num_features)
@@ -151,7 +161,10 @@ class PriTEncoder(nn.Module):
 
     def _build_blocks(self, dim, num_heads, depth, dpr=None, init_values=0., block=Block):
         dpr = dpr or ([0.] * depth)
-        blocks = [block(
+        if not isinstance(block, (tuple, list)):
+            block = [block] * depth
+        assert isinstance(block, (tuple, list)) and len(block) == depth
+        blocks = [block[i](
             dim=dim, num_heads=num_heads, mlp_ratio=self.mlp_ratio, qkv_bias=self.qkv_bias,
             qk_scale=self.qk_scale, drop=self.drop_rate, attn_drop=self.attn_drop_rate, drop_path=dpr[i],
             norm_layer=self.norm_layer, act_layer=self.act_layer, init_values=init_values)
@@ -774,7 +787,7 @@ def pretrain_vit_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
             strides=[1],
             depths=[12],
             dims=[384],
-            blocks_type=['normal'],
+            blocks_type=kwargs.pop('blocks_type') or ['normal'],
             num_heads=kwargs.pop('num_heads') or [6],
             **kwargs,
         ),
@@ -801,7 +814,7 @@ def pretrain_prit_local_small_GGGG_patch16_224(decoder_dim, decoder_depth, decod
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
-            blocks_type=('normal', 'normal', 'normal', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('normal', 'normal', 'normal', 'normal'),
             num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
             **kwargs,
         ),
@@ -828,7 +841,7 @@ def pretrain_prit_local_small_LGGG_patch16_224(decoder_dim, decoder_depth, decod
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
-            blocks_type=('local', 'normal', 'normal', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('local', 'normal', 'normal', 'normal'),
             num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
             **kwargs,
         ),
@@ -855,7 +868,7 @@ def pretrain_prit_local_small_LLGG_patch16_224(decoder_dim, decoder_depth, decod
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
-            blocks_type=('local', 'local', 'normal', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('local', 'local', 'normal', 'normal'),
             num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
             **kwargs,
         ),
@@ -882,7 +895,7 @@ def pretrain_prit_local_small_LLLG_patch16_224(decoder_dim, decoder_depth, decod
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
-            blocks_type=('local', 'local', 'local', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('local', 'local', 'local', 'normal'),
             num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
             **kwargs,
         ),
@@ -909,7 +922,7 @@ def pretrain_prit_local_small_LLLL_patch16_224(decoder_dim, decoder_depth, decod
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
-            blocks_type=('local', 'local', 'local', 'local'),
+            blocks_type=kwargs.pop('blocks_type') or ('local', 'local', 'local', 'local'),
             num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
             **kwargs,
         ),
@@ -936,7 +949,7 @@ def pretrain_prit_local_small_SrGGG_patch16_224(decoder_dim, decoder_depth, deco
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
-            blocks_type=('spacial_reduction', 'normal', 'normal', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('spacial_reduction', 'normal', 'normal', 'normal'),
             num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
             **kwargs,
         ),
@@ -963,7 +976,7 @@ def pretrain_prit3_local_small_b_patch16_224(decoder_dim, decoder_depth, decoder
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(96, 192, 384, 768),
-            blocks_type=('local', 'normal', 'normal', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('local', 'normal', 'normal', 'normal'),
             num_heads=kwargs.pop('num_heads') or (6, 6, 6, 6),
             **kwargs,
         ),
@@ -990,7 +1003,7 @@ def pretrain_vit_base_patch16_224(decoder_dim, decoder_depth, decoder_num_heads,
             strides=[1],
             depths=[12],
             dims=[768],
-            blocks_type=['normal'],
+            blocks_type=kwargs.pop('blocks_type') or ['normal'],
             num_heads=kwargs.pop('num_heads') or [12],
             **kwargs,
         ),
@@ -1017,7 +1030,7 @@ def pretrain_prit_local_base_LGGG_patch16_224(decoder_dim, decoder_depth, decode
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(192, 384, 768, 1536),
-            blocks_type=('local', 'normal', 'normal', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('local', 'normal', 'normal', 'normal'),
             num_heads=kwargs.pop('num_heads') or (12, 12, 12, 12),
             **kwargs,
         ),
@@ -1044,7 +1057,7 @@ def pretrain_prit_local_base_LLGG_patch16_224(decoder_dim, decoder_depth, decode
             strides=(1, 2, 2, 2),
             depths=(2, 2, 7, 1),
             dims=(192, 384, 768, 1536),
-            blocks_type=('local', 'local', 'normal', 'normal'),
+            blocks_type=kwargs.pop('blocks_type') or ('local', 'local', 'normal', 'normal'),
             num_heads=kwargs.pop('num_heads') or (12, 12, 12, 12),
             **kwargs,
         ),

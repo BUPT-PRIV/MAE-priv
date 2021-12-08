@@ -178,6 +178,36 @@ class LocalBlock(Block):
         return x
 
 
+class DilatedBlock(Block):
+    def __init__(self, num_patches, dilation, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.num_patches = num_patches
+        self.dilation = dilation
+
+    def forward(self, x):
+        B, PG, L = x.shape
+        P = self.num_patches
+        Dh = Dw = self.dilation
+        Gh = Gw = int((PG // P) ** 0.5)
+
+        x = x.reshape(B, P, Gh // Dh, Dh, Gw // Dw, Dw, L)
+        x = x.permute(0, 3, 5, 1, 2, 4, 6)  # B, Dh, Dw, P, Gh / Dh, Gw / Dw, L
+        x = x.reshape(B * Dh * Dw, -1, L)
+
+        if self.gamma_1 is None:
+            x = x + self.drop_path(self.attn(self.norm1(x)))  # attention of (P x Gh / Dh * Gw / Dw)
+            x = x + self.drop_path(self.mlp(self.norm2(x)))
+        else:
+            x = x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
+            x = x + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x)))
+
+        x = x.reshape(B, Dh, Dw, P, Gh // Dh, Gw // Dw, L)
+        x = x.permute(0, 3, 4, 1, 5, 2, 6)  # B, P, Gh / Dh, Dh, Gw / Dw, Dh, L
+        x = x.reshape(B, PG, L)
+
+        return x
+
+
 class SRBlock(nn.Module):
 
     def __init__(self, num_patches, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,

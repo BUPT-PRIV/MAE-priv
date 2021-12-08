@@ -55,6 +55,8 @@ def get_args():
                         help='images input size')
     parser.add_argument('--num_heads', default=None, type=list,
                         help='num heads of echo stage.')
+    parser.add_argument('--blocks', default=None, type=list,
+                        help='block of echo stage.')
 
     parser.add_argument('--drop', type=float, default=0.0, metavar='PCT',
                         help='Dropout rate (default: 0.)')
@@ -318,6 +320,7 @@ def main(args, ds_init):
         use_mean_pooling=args.use_mean_pooling,
         init_scale=args.init_scale,
         num_heads=args.num_heads,
+        blocks_type=args.blocks,
         patch_downsample=args.patch_downsample,
     )
 
