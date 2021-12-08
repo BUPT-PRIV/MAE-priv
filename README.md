@@ -28,11 +28,11 @@ For k-NN evaluation, we use `k=10` as default.
 | :------------: | :----: | :------: | :--: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
 |      100       |  GAP   |  76.58%  |  34.65%  |  19.7%  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1FZ2ii8FtbO6TDIU9scEH85nVANOLQac1/view?usp=sharing) [finetune](https://drive.google.com/file/d/1WfXf4vJXcYMUzGx_rma8Q1KEzWrXbwki/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1IuAqrz23PwaA1_B9bYYqD0P4cXAYf2ZE/view?usp=sharing) [finetune](https://drive.google.com/file/d/1DqfVpG6pztPi1T2HYOcovESYv7lHyDXa/view?usp=sharing) |
 |      200       |  GAP   |    76.86%    |    36.46%    |  19.8%  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_200E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1ufbovFHqYhz78Usz01SQ3mNlL0NoqIjC/view?usp=sharing) [finetune](https://drive.google.com/file/d/1wq0FVHfR9LN7AV5FzqHGPyDY0V3FHYKI/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/116tiw2HqXQxr4i0xU_ZRDa6IDLP3wvwy/view?usp=sharing) [finetune](https://drive.google.com/file/d/1U2Qh5i6BtGjBBEUmmsAbl7HvIG0OrQx2/view?usp=sharing) |
-|      400       |  GAP   |  77.56%  |  36.98%  |  20.8%  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1GEuNN4yYYkjnKJyh65GDoEfH5s1AOPYm/view?usp=sharing) [finetune](https://drive.google.com/file/d/1v7Iy_FtNpDK89aCsTkAOH3fGZixv_dVs/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1iBastCBVK6goDtjqXSILyuqtR0ppbCmo/view?usp=sharing) [finetune](https://drive.google.com/file/d/1T8titxifdMm55UOP7lkGc27g7UPj97Jh/view?usp=sharing) |
-|      800       |  GAP   |    77.93%    |    36.88%    |  20.7%  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_800E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1dmzysQ2phLcbNfrmuSdsK_I5ltokOVXk/view?usp=sharing) [finetune](https://drive.google.com/file/d/13QRr63oNWhRfU3C1-HsTN3oB5EURr68t/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/17mPfUCclcCmWOmQneaNYTQQmYWl3T2U7/view?usp=sharing) [finetune](https://drive.google.com/file/d/1fpmpfBH5JCr-2MGDlRQsL0j7aVTlfLtP/view?usp=sharing) |
+|      400       |  GAP   |  77.56% / 80.02% / 80.89%  |  36.98%  |  20.8%  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1GEuNN4yYYkjnKJyh65GDoEfH5s1AOPYm/view?usp=sharing) [finetune](https://drive.google.com/file/d/1v7Iy_FtNpDK89aCsTkAOH3fGZixv_dVs/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1iBastCBVK6goDtjqXSILyuqtR0ppbCmo/view?usp=sharing) [finetune](https://drive.google.com/file/d/1T8titxifdMm55UOP7lkGc27g7UPj97Jh/view?usp=sharing) |
+|      800       |  GAP   |    77.93% / 80.87% / 81.11%    |    36.88%    |  20.7%  | [pretrain](cfgs/pretrain/baseline_small/ViT-S_800E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1dmzysQ2phLcbNfrmuSdsK_I5ltokOVXk/view?usp=sharing) [finetune](https://drive.google.com/file/d/13QRr63oNWhRfU3C1-HsTN3oB5EURr68t/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/17mPfUCclcCmWOmQneaNYTQQmYWl3T2U7/view?usp=sharing) [finetune](https://drive.google.com/file/d/1fpmpfBH5JCr-2MGDlRQsL0j7aVTlfLtP/view?usp=sharing) |
 |      1600      |  GAP   |    -     |         |  -   | [pretrain](cfgs/pretrain/baseline_small/ViT-S_1600E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-S_50E_GAP.yaml) |                      pretrain finetune                       |                      pretrain finetune                       |
 
-- We finetune models by 50 epochs as default.
+- We finetune models by 50 epochs as default. For 400 and 800 epochs pretraining, we use 50 / 100 / 150 epochs for fine-tuning (logs and weights provided under 50 epochs).
 - [BaiduNetdisk](https://pan.baidu.com/s/1zc2JI_oJUS5l0hHcMIQa7w) （2lt1）
 
 ### ViT-Base
@@ -41,8 +41,17 @@ For k-NN evaluation, we use `k=10` as default.
 | :------------: | :----: | :------: | :---: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
 |      400       |  GAP   |  83.08%  | 28.9% | [pretrain](cfgs/pretrain/ViT-B_400E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-B_100E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1u3edwhpXYSQgi0FXKsI1dumWDOUICjIA/view?usp=sharing) [finetune](https://drive.google.com/file/d/15EzQAgSOb_LTPGRTM83QTrpvmpq5ONxc/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1tm0QaZaK9b2vcL8t4RRnUpO6OzQcBaL6/view?usp=sharing) [finetune](https://drive.google.com/file/d/1LYMRjcohw2BfFPTOtvNSq2ZxMhdoHpIT/view?usp=sharing) |
 
-- We finetune models by 100 epochs as default.
+- Following paper, we finetune models by 100 epochs as default.
 - [BaiduNetdisk](https://pan.baidu.com/s/1W0Vl753XR9mkW3D75Hc7OA)  (k2ef)
+
+### ViT-Large
+
+| pretrain epoch | repre. | ft. top1 | k-NN |                            config                            |                            weight                            |                             log                              |
+| :------------: | :----: | :------: | :--: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
+|      100       |  GAP   |  83.51%  |  -   | [pretrain](cfgs/pretrain/ViT-L_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-L_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1g_3LuDIFtrpKBZwXLcAafeM8KMm9PcwX/view?usp=sharing) [finetune](https://drive.google.com/file/d/1RYLHs_1KoLVGK8KdPiC0aji3jblv46Vo/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1VSnw8iJLMZeKuK2J6zIX9rgCru7XzJjM/view?usp=sharing) [finetune](https://drive.google.com/file/d/19rAz4VjmKUx8RIzQQg1uaLJOb-2Ios1F/view?usp=sharing) |
+
+- Following paper, we finetune models by 50 epochs as default.
+- [BaiduNetdisk](https://pan.baidu.com/s/1c3MN4BS6PfxjolKz_cX5pQ)  (825g)
 
 
 ## Usage
