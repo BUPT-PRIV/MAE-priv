@@ -9,7 +9,7 @@ from torch.nn.modules.utils import _pair as to_2tuple
 from utils.layers import trunc_normal_
 from utils.registry import register_model
 
-from .layers import (PatchEmbed, PatchPool, PatchConv, PatchFlatten, PatchUpsample,
+from .layers import (PatchEmbed, PatchPool, PatchConv, PatchDWConv, PatchUpsample,
                      Block, LocalBlock, SRBlock, 
                      Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, _cfg
@@ -114,7 +114,7 @@ class PriT(nn.Module):
         patch_downsample = {
             "pool": PatchPool,
             "conv": PatchConv,
-            "flatten": PatchFlatten,
+            "dwconv": PatchDWConv,
         }[patch_downsample]
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule

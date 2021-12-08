@@ -9,7 +9,7 @@ from utils.layers import to_2tuple
 from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 
-from .layers import (PatchEmbed, PatchFlatten, PatchConv, PatchPool, PatchUpsample,
+from .layers import (PatchEmbed, PatchConv, PatchPool, PatchDWConv, PatchUpsample,
                      Block, LocalBlock, SRBlock, 
                      Output, LocalOutput, SROutput)
 from .utils import build_2d_sincos_position_embedding, _cfg
@@ -122,7 +122,7 @@ class PriTEncoder(nn.Module):
         patch_downsample = {
             "pool": PatchPool,
             "conv": PatchConv,
-            "flatten": PatchFlatten,
+            "dwconv": PatchDWConv,
         }[patch_downsample]
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
@@ -227,7 +227,6 @@ class PriTDecoder1(nn.Module):
         self.stride = stride
 
         # build encoder linear projection(s) and mask token(s)
-        self.encoder_linear_proj = nn.Linear(num_features, decoder_dim, bias=False)
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
 
         # pos_embed
@@ -242,6 +241,8 @@ class PriTDecoder1(nn.Module):
         # weight initialization
         self.apply(self._init_weights)
         trunc_normal_(self.mask_token, std=.02)
+
+        self.encoder_linear_proj = nn.Linear(num_features, decoder_dim, bias=False)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):

@@ -109,7 +109,7 @@ def auto_load_model(args, model, model_without_ddp, optimizer, loss_scaler, mode
                     latest_ckpt = 'latest'
                     break
             if latest_ckpt != -1:
-                args.resume = os.path.join(output_dir, 'checkpoint-%d.pth' % latest_ckpt)
+                args.resume = os.path.join(output_dir, f'checkpoint-{latest_ckpt}.pth')
             print("Auto resume checkpoint: %s" % args.resume)
 
         if args.resume:

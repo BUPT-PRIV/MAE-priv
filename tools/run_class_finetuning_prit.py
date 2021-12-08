@@ -143,7 +143,7 @@ def get_args():
     parser.add_argument('--model_prefix', default='', type=str)
     parser.add_argument('--init_scale', default=0.001, type=float)
     parser.add_argument('--use_mean_pooling', default=False, type=bool)
-    parser.add_argument('--patch_downsample', default='pool', type=str, choices=['pool', 'conv', 'flatten'],
+    parser.add_argument('--patch_downsample', default='pool', type=str, choices=['pool', 'conv', 'dwconv'],
                         help='parch downsample method.')
 
     # Dataset parameters
