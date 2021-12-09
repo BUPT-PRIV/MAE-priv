@@ -1,12 +1,14 @@
-output_dir: 'output/pretrain/small_baseline/prit_local_small_SrGGG_100e_patch16_224_GAP'
+output_dir: 'output/pretrain/small_baseline/prit_local_small_LGGG_100e_patch16_224_GAP_dilated2'
 
 # Architecture
-model: pretrain_prit_local_small_SrGGG_224
+model: pretrain_prit_local_small_LGGG_224
 decoder_dim: 192
 decoder_depth: 4
 use_mean_pooling: True
 normlize_target: True
 mask_ratio: 0.75
+blocks: [[dilated, local], normal, normal, normal]
+dilation_facter: 2
 
 # Train
 epochs: 100

@@ -36,7 +36,7 @@ class PriTEncoder(nn.Module):
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
                  num_heads=(12, 12, 12, 12), blocks_type=('normal', 'normal', 'normal', 'normal'),
-                 mask_ratio=0.75,
+                 mask_ratio=0.75, dilation_facter=1,
                  patch_downsample='pool', use_mean_pooling=True, pyramid_reconstruction=False):
         """
         Args:
@@ -114,7 +114,7 @@ class PriTEncoder(nn.Module):
 
         def get_block(name, stage_idx):
             if name == 'dilated':
-                dilation = 8 // (2 ** stage_idx)
+                dilation = dilation_facter * 8 // (2 ** stage_idx)
                 return partial(DilatedBlock, self.num_visible, dilation)
             return {
                 "normal": Block,
@@ -800,7 +800,7 @@ def pretrain_vit_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
 
 
 @register_model
-def pretrain_prit_local_small_GGGG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_small_GGGG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.534112 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -827,7 +827,7 @@ def pretrain_prit_local_small_GGGG_patch16_224(decoder_dim, decoder_depth, decod
 
 
 @register_model
-def pretrain_prit_local_small_LGGG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_small_LGGG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.534112 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -854,7 +854,7 @@ def pretrain_prit_local_small_LGGG_patch16_224(decoder_dim, decoder_depth, decod
 
 
 @register_model
-def pretrain_prit_local_small_LLGG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_small_LLGG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.534112 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -881,7 +881,7 @@ def pretrain_prit_local_small_LLGG_patch16_224(decoder_dim, decoder_depth, decod
 
 
 @register_model
-def pretrain_prit_local_small_LLLG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_small_LLLG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.534112 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -908,7 +908,7 @@ def pretrain_prit_local_small_LLLG_patch16_224(decoder_dim, decoder_depth, decod
 
 
 @register_model
-def pretrain_prit_local_small_LLLL_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_small_LLLL_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.534112 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -935,7 +935,7 @@ def pretrain_prit_local_small_LLLL_patch16_224(decoder_dim, decoder_depth, decod
 
 
 @register_model
-def pretrain_prit_local_small_SrGGG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_small_SrGGG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     #  M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -962,7 +962,7 @@ def pretrain_prit_local_small_SrGGG_patch16_224(decoder_dim, decoder_depth, deco
 
 
 @register_model
-def pretrain_prit3_local_small_b_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit3_local_small_LGGG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 23.534112 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -1016,7 +1016,7 @@ def pretrain_vit_base_patch16_224(decoder_dim, decoder_depth, decoder_num_heads,
 
 
 @register_model
-def pretrain_prit_local_base_LGGG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_base_LGGG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 92.813376 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64
@@ -1043,7 +1043,7 @@ def pretrain_prit_local_base_LGGG_patch16_224(decoder_dim, decoder_depth, decode
 
 
 @register_model
-def pretrain_prit_local_base_LLGG_patch16_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
+def pretrain_prit_local_base_LLGG_224(decoder_dim, decoder_depth, decoder_num_heads, **kwargs):
     # 92.813376 M
     if decoder_num_heads is None:
         decoder_num_heads = decoder_dim // 64

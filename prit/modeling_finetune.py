@@ -32,6 +32,7 @@ class PriT(nn.Module):
                  # args for PriT
                  strides=(1, 2, 2, 2), depths=(2, 2, 6, 2), dims=(48, 96, 192, 384),
                  num_heads=(12, 12, 12, 12), blocks_type=('normal', 'normal', 'normal', 'normal'),
+                 dilation_facter=1,
                  patch_downsample='pool', use_mean_pooling=True, pyramid_reconstruction=False):
         """
         Args:
@@ -106,7 +107,7 @@ class PriT(nn.Module):
 
         def get_block(name, stage_idx):
             if name == 'dilated':
-                dilation = 8 // (2 ** stage_idx)
+                dilation = dilation_facter * 8 // (2 ** stage_idx)
                 return partial(DilatedBlock, self.num_patches, dilation)
             return {
                 "normal": Block,
@@ -240,7 +241,7 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_GGGG_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_GGGG_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -256,7 +257,7 @@ def prit_local_small_GGGG_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_LGGG_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_LGGG_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -272,7 +273,7 @@ def prit_local_small_LGGG_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_LLGG_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_LLGG_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -288,7 +289,7 @@ def prit_local_small_LLGG_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_LLLG_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_LLLG_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -304,7 +305,7 @@ def prit_local_small_LLLG_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_LLLL_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_LLLL_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -320,7 +321,7 @@ def prit_local_small_LLLL_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_small_SrGGG_patch16_224(pretrained=False, **kwargs):
+def prit_local_small_SrGGG_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -352,7 +353,7 @@ def vit_base_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_base_LGGG_patch16_224(pretrained=False, **kwargs):
+def prit_local_base_LGGG_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,
@@ -368,7 +369,7 @@ def prit_local_base_LGGG_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
-def prit_local_base_LLGG_patch16_224(pretrained=False, **kwargs):
+def prit_local_base_LLGG_224(pretrained=False, **kwargs):
     model = PriT(
         img_size=224,
         patch_size=4,

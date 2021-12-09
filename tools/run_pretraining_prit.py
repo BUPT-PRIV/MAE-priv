@@ -60,12 +60,14 @@ def get_args():
                         help='normalized the target patch pixels')
     parser.add_argument('--use_mean_pooling', default=False, type=bool,
                         help='use mean pooling for classification. use cls-token if false.')
+    parser.add_argument('--patch_downsample', default='pool', type=str, choices=['pool', 'conv', 'dwconv'],
+                        help='parch downsample method.')
     parser.add_argument('--num_heads', default=None, type=list,
                         help='num heads of echo stage.')
     parser.add_argument('--blocks', default=None, type=list,
                         help='block of echo stage.')
-    parser.add_argument('--patch_downsample', default='pool', type=str, choices=['pool', 'conv', 'dwconv'],
-                        help='parch downsample method.')
+    parser.add_argument('--dilation_facter', default=1, type=int,
+                        help='dilation facter')
 
     # Optimizer parameters
     parser.add_argument('--opt', default='adamw', type=str, metavar='OPTIMIZER',
@@ -169,6 +171,7 @@ def get_model(args):
         num_heads=args.num_heads,
         blocks_type=args.blocks,
         patch_downsample=args.patch_downsample,
+        dilation_facter=args.dilation_facter,
     )
 
     if args.cal_flops:
