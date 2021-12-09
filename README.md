@@ -46,9 +46,9 @@ For k-NN evaluation, we use `k=10` as default.
 
 ### ViT-Large
 
-| pretrain epoch | repre. | ft. top1 | k-NN |                            config                            |                            weight                            |                             log                              |
-| :------------: | :----: | :------: | :--: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|      100       |  GAP   |  83.51%  |  -   | [pretrain](cfgs/pretrain/ViT-L_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-L_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1g_3LuDIFtrpKBZwXLcAafeM8KMm9PcwX/view?usp=sharing) [finetune](https://drive.google.com/file/d/1RYLHs_1KoLVGK8KdPiC0aji3jblv46Vo/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1VSnw8iJLMZeKuK2J6zIX9rgCru7XzJjM/view?usp=sharing) [finetune](https://drive.google.com/file/d/19rAz4VjmKUx8RIzQQg1uaLJOb-2Ios1F/view?usp=sharing) |
+| pretrain epoch | repre. | ft. top1 |  lin.  |  k-NN  |                            config                            |                            weight                            |                             log                              |
+| :------------: | :----: | :------: | :----: | :----: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
+|      100       |  GAP   |  83.51%  | 58.90% | 33.08% | [pretrain](cfgs/pretrain/ViT-L_100E_Norm_GAP.yaml) [finetune](cfgs/finetune/ViT-L_50E_GAP.yaml) | [pretrain](https://drive.google.com/file/d/1g_3LuDIFtrpKBZwXLcAafeM8KMm9PcwX/view?usp=sharing) [finetune](https://drive.google.com/file/d/1RYLHs_1KoLVGK8KdPiC0aji3jblv46Vo/view?usp=sharing) | [pretrain](https://drive.google.com/file/d/1VSnw8iJLMZeKuK2J6zIX9rgCru7XzJjM/view?usp=sharing) [finetune](https://drive.google.com/file/d/19rAz4VjmKUx8RIzQQg1uaLJOb-2Ios1F/view?usp=sharing) |
 
 - Following paper, we finetune models by 50 epochs as default.
 - [BaiduNetdisk](https://pan.baidu.com/s/1c3MN4BS6PfxjolKz_cX5pQ)  (825g)
