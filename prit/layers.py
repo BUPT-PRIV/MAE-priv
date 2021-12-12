@@ -1,4 +1,5 @@
 from functools import partial
+from typing import Callable
 
 import torch
 import torch.nn as nn
@@ -98,7 +99,13 @@ class SRAttention(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.act = nn.GELU()
 
-        self.num_patches = num_patches
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         B, N, L = x.shape
@@ -161,7 +168,13 @@ class Block(nn.Module):
 class LocalBlock(Block):
     def __init__(self, num_patches, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.num_patches = num_patches
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         B, N, L = x.shape
@@ -181,8 +194,14 @@ class LocalBlock(Block):
 class DilatedBlock(Block):
     def __init__(self, num_patches, dilation, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.num_patches = num_patches
         self.dilation = dilation
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         B, PG, L = x.shape
@@ -272,7 +291,6 @@ class PatchPool(nn.Module):
 
         self.dim_in = dim_in
         self.dim_out = dim_out
-        self.num_patches = num_patches
         self.stride = stride
         self.with_cls_token = with_cls_token
 
@@ -285,6 +303,14 @@ class PatchPool(nn.Module):
 
         self.reduction = nn.Linear(dim_in, dim_out, bias=False)
         self.norm = norm_layer(dim_out)
+
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         if self.pool is not None:
@@ -320,7 +346,6 @@ class PatchConv(nn.Module):
 
         self.dim_in = dim_in
         self.dim_out = dim_out
-        self.num_patches = num_patches
         self.stride = stride
         self.with_cls_token = with_cls_token
 
@@ -333,6 +358,14 @@ class PatchConv(nn.Module):
 
         self.reduction = nn.Identity()
         self.norm = norm_layer(dim_out)
+
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         if self.pool is not None:
@@ -368,7 +401,6 @@ class PatchDWConv(nn.Module):
 
         self.dim_in = dim_in
         self.dim_out = dim_out
-        self.num_patches = num_patches
         self.stride = stride
         self.with_cls_token = with_cls_token
 
@@ -381,6 +413,14 @@ class PatchDWConv(nn.Module):
 
         self.reduction = nn.Linear(dim_in, dim_out, bias=False)
         self.norm = norm_layer(dim_out)
+
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         if self.pool is not None:
@@ -416,9 +456,16 @@ class PatchUpsample(nn.Module):
         if stride != 2:
             raise ValueError(stride)
 
-        self.num_patches = num_patches
         self.stride = stride
         self.upsampler = partial(F.interpolate, scale_factor=stride, mode='bilinear', align_corners=False)
+
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         B, VG, L = x.shape
@@ -453,7 +500,13 @@ class Output(nn.Module):
 class LocalOutput(Output):
     def __init__(self, num_patches, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.num_patches = num_patches
+        self._num_patches = num_patches
+
+    @property
+    def num_patches(self):
+        if isinstance(self._num_patches, Callable):
+            return self._num_patches()
+        return self._num_patches
 
     def forward(self, x):
         B, N, L = x.shape

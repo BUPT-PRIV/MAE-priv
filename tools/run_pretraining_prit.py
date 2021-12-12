@@ -44,7 +44,7 @@ def get_args():
     # Model parameters
     parser.add_argument('--model', default='pretrain_mae_base_patch16_224', type=str, metavar='MODEL',
                         help='Name of model to train')
-    parser.add_argument('--mask_ratio', default=0.75, type=float,
+    parser.add_argument('--mask_ratio', default=0.75, type=float, nargs='+',
                         help='ratio of the visual tokens/patches need be masked')
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size for backbone')
@@ -198,7 +198,7 @@ def main(args):
     np.random.seed(seed)
     # random.seed(seed)
 
-    cudnn.benchmark = True
+    cudnn.benchmark = isinstance(args.mask_ratio, float)
 
     model = get_model(args)
     patch_size = model.encoder.patch_embed.patch_size

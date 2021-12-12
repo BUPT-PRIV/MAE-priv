@@ -1,7 +1,7 @@
-output_dir: 'output/pretrain/small_baseline/prit3_local_small_b_100e_224_GAP'
+output_dir: 'output/pretrain/small_baseline/prit2_local_small_b_100e_patch16_224_GAP'
 
 # Architecture
-model: pretrain_prit3_local_small_LGGG_224
+model: pretrain_prit2_local_small_LGGG_224
 decoder_dim: 192
 decoder_depth: 1
 use_mean_pooling: True
