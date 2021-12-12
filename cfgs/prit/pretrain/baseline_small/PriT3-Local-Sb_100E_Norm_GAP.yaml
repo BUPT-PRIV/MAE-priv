@@ -1,4 +1,4 @@
-output_dir: 'output/pretrain/small_baseline/prit3_local_small_b_100e_patch16_224_GAP'
+output_dir: 'output/pretrain/small_baseline/prit3_local_small_b_100e_224_GAP'
 
 # Architecture
 model: pretrain_prit3_local_small_LGGG_224

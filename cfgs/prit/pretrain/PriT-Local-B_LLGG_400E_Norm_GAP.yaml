@@ -1,4 +1,4 @@
-output_dir: 'output/pretrain/prit_local_base_LLGG_400e_patch16_224_GAP'
+output_dir: 'output/pretrain/prit_local_base_LLGG_400e_224_GAP'
 
 # Architecture
 model: pretrain_prit_local_base_LLGG_224

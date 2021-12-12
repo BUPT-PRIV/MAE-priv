@@ -1,13 +1,14 @@
-output_dir: 'output/pretrain/small_baseline/prit_local_small_LGGG_100e_224_GAP_num_heads'
+output_dir: 'output/pretrain/prit_local_small_LLGG_100e_224_GAP_impr'
 
 # Architecture
-model: pretrain_prit_local_small_LGGG_224
+model: pretrain_prit_local_small_LLGG_224
 decoder_dim: 192
 decoder_depth: 4
 use_mean_pooling: True
 normlize_target: True
 mask_ratio: 0.75
 num_heads: [2, 3, 6, 12]
+patch_downsample: dwconv
 
 # Train
 epochs: 100

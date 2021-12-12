@@ -375,7 +375,7 @@ class PatchDWConv(nn.Module):
         if stride == 1:
             self.pool = None
         elif stride == 2:
-            self.pool = nn.Conv2d(dim_in, dim_in, 3, stride=2, padding=1, groups=dim_in)
+            self.pool = nn.Conv2d(dim_in, dim_in, 2, stride=2, groups=dim_in)
         else:
             raise ValueError(stride)
 

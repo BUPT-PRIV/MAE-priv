@@ -1,8 +1,10 @@
-output_dir: 'output/finetune/prit_small_d_224_GAP'
+output_dir: 'output/finetune/prit_small_LLGG_224_GAP_impr'
 
 # Architecture
-model: prit_local_small_LLLG_224
+model: prit_local_small_LLGG_224
 use_mean_pooling: True # not use cls-token
+num_heads: [2, 3, 6, 12]
+patch_downsample: dwconv
 
 # Train
 epochs: 50

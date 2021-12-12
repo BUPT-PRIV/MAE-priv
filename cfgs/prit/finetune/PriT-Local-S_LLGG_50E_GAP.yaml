@@ -1,4 +1,4 @@
-output_dir: 'output/finetune/prit_small_LLGG_patch16_224_GAP'
+output_dir: 'output/finetune/prit_small_LLGG_224_GAP'
 
 # Architecture
 model: prit_local_small_LLGG_224
