@@ -70,7 +70,8 @@ class PretrainVisionTransformerEncoder(nn.Module):
         if use_learnable_pos_emb:
             trunc_normal_(self.pos_embed, std=.02)
 
-        # trunc_normal_(self.cls_token, std=.02)
+        if not use_mean_pooling:
+            trunc_normal_(self.cls_token, std=.02)
         self.apply(self._init_weights)
 
     def build_2d_sincos_position_embedding(self, embed_dim=768, temperature=10000., decode=False):
@@ -127,18 +128,18 @@ class PretrainVisionTransformerEncoder(nn.Module):
 
         if not self.use_mean_pooling:
             visible_token = shuffle_token[:, :self.visible_size + 1, :]  # Bx(14*14*0.25+1)x768 = Bx50x768
-            shuffle = shuffle[1:] - 1
         else:
             visible_token = shuffle_token[:, :self.visible_size, :]  # Bx(14*14*0.25)x768 = Bx49x768
 
         for blk in self.blocks:
             visible_token = blk(visible_token)
 
-        visible_token = self.norm(visible_token)
-
         # not return cls_token
         if not self.use_mean_pooling:
             visible_token = visible_token[:, 1:, :]
+            shuffle = shuffle[1:] - 1
+
+        visible_token = self.norm(visible_token)
 
         return visible_token, shuffle
 
