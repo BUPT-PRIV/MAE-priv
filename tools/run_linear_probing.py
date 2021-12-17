@@ -568,7 +568,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         BatchNorm in train mode may revise running mean/std (even if it receives
         no gradient), which are part of the model parameters too.
         """
-    model.eval()
+    model.train()
 
     if loss_scaler is None:
         model.zero_grad()

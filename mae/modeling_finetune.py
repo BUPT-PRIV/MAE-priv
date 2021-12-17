@@ -237,7 +237,7 @@ class VisionTransformer(nn.Module):
                 drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer,
                 init_values=init_values)
             for i in range(depth)])
-        self.fc_norm = LP_BatchNorm(embed_dim, affine=False) if lin_probe else norm_layer(embed_dim)
+        self.fc_norm = nn.BatchNorm1d(embed_dim, affine=False) if lin_probe else norm_layer(embed_dim)
         self.lin_probe = lin_probe
 
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
@@ -316,10 +316,7 @@ class VisionTransformer(nn.Module):
         else:
             x = x[:, 0]
 
-        if self.lin_probe:
-            return self.fc_norm(x, is_train=is_train)
-        else:
-            return self.fc_norm(x)
+        return self.fc_norm(x)
 
     def forward(self, x, is_train=True):
         x = self.forward_features(x, is_train)
