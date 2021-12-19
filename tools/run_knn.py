@@ -115,7 +115,7 @@ def extract_feature_pipeline(args):
             checkpoint_model['pos_embed'] = new_pos_embed
     utils.load_state_dict(model, checkpoint_model)
     # del fc & fc_norm
-    model.fc_norm = None
+    model.fc_norm = nn.Identity()
     model.head = nn.Identity()
 
     if args.use_cuda:
