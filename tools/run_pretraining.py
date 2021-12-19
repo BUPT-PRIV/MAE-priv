@@ -277,6 +277,10 @@ def main(args):
                 utils.save_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch)
+            else:
+                utils.save_model(
+                    args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
+                    loss_scaler=loss_scaler, epoch=epoch, epoch_name="latest")
 
         log_stats = {**{k: v for k, v in train_stats.items()},
                      'epoch': epoch, 'n_parameters': n_parameters}
@@ -319,7 +323,7 @@ def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, optimizer: to
         loss_value = loss.item()
 
         if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
+            print("Loss is {}, stopping training".format(loss_value), force=True)
             sys.exit(1)
 
         optimizer.zero_grad()
