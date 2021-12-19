@@ -321,13 +321,17 @@ class PretrainVisionTransformer(nn.Module):
         target = target.view(
             [B, C, H // self.patch_size, self.patch_size, W // self.patch_size, self.patch_size]
         )  # Bx3x224x224 --> Bx3x16x14x16x14
-        # Bx3x14x16x14x16 --> Bx(14*14)x(16*16*3)
-        target = target.permute([0, 2, 4, 3, 5, 1]).reshape(B, self.num_patches, -1, C)
-
+        # Bx3x14x16x14x16 --> Bx(14*14)x(3*16*16)
+        target = target.permute([0, 2, 4, 1, 3, 5]).reshape(B, self.num_patches, -1)
         if self.normalized_pixel:
-            mean = target.mean(dim=-2, keepdim=True)
-            std = target.var(dim=-2, unbiased=True, keepdim=True).sqrt()
-            target = (target - mean) / (std + 1e-6)
+            # biased
+            # normalized_shape = [C * self.patch_size * self.patch_size]
+            # target = F.layer_norm(target, normalized_shape, eps=1e-6)
+
+            # unbiased
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, unbiased=True, keepdim=True)
+            target = (target - mean) / (var + 1e-6).sqrt()
         target = target.view(B, self.num_patches, -1)
 
         return self._mse_loss(decoder_output, target, masked_index=shuffle[self.visible_size:])
