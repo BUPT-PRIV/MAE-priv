@@ -13,7 +13,7 @@ epochs: 200
 opt: adamw
 lr: 0.00015 # base_lr = 1.5e-4, lr = base_lr * batch-size / 256
 warmup_lr: 0.000001 # 1e-6
-min_lr: 0.00001 # 1e-5
+min_lr: 0.
 warmup_epochs: 20
 batch_size: 512
 hflip: 0.5
