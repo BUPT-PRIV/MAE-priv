@@ -11,7 +11,6 @@ from .cross_entropy import SoftTargetCrossEntropy, LabelSmoothingCrossEntropy
 from .data_constants import *
 from .deepspeed_cfg import *
 from .dist import *
-from .lincls_bn import LP_BatchNorm
 from .logger import *
 from .metrics import accuracy, AverageMeter
 from .mixup import Mixup, FastCollateMixup

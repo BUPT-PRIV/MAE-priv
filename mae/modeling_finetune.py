@@ -14,7 +14,6 @@ import torch.nn.functional as F
 
 from utils.layers import drop_path, to_2tuple, trunc_normal_
 from utils.registry import register_model
-from utils import LP_BatchNorm
 
 
 def _cfg(url='', **kwargs):
@@ -297,7 +296,7 @@ class VisionTransformer(nn.Module):
         self.num_classes = num_classes
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-    def forward_features(self, x, is_train=True):
+    def forward_features(self, x):
         x = self.patch_embed(x)
         B, _, _ = x.size()
 
@@ -318,8 +317,8 @@ class VisionTransformer(nn.Module):
 
         return self.fc_norm(x)
 
-    def forward(self, x, is_train=True):
-        x = self.forward_features(x, is_train)
+    def forward(self, x):
+        x = self.forward_features(x)
         x = self.head(x)
         return x
 
