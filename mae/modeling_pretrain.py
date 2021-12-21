@@ -306,9 +306,9 @@ class PretrainVisionTransformer(nn.Module):
         encoded_visible_patches, shuffle = self.encoder(x)  # [B, N_vis, C_e]
         encoded_visible_patches = self.encoder_to_decoder(encoded_visible_patches)  # [B, N_vis, C_d]
 
-        decoder_input = torch.cat(
-            [encoded_visible_patches, self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])], dim=1
-        )[:, shuffle.sort()[1], :]
+        mask_tokens = self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])
+        decoder_input = torch.cat([encoded_visible_patches, mask_tokens], dim=1)
+        decoder_input = decoder_input[:, shuffle.argsort(), :]
         decoder_input = decoder_input + self.decoder_pos_embed
 
         # decode (encoded_visible_patches + mask_token)
