@@ -38,6 +38,7 @@ class PretrainVisionTransformerEncoder(nn.Module):
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.use_mean_pooling = use_mean_pooling
+        self.use_cls_token = use_cls_token = not use_mean_pooling
 
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
@@ -47,9 +48,7 @@ class PretrainVisionTransformerEncoder(nn.Module):
         self.masked_size = int(self.mask_ratio * self.num_patches)  # 147
         self.visible_size = self.num_patches - self.masked_size  # 49
 
-        if use_mean_pooling:
-            self.cls_token = None
-        else:
+        if use_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         if use_learnable_pos_emb:
@@ -70,7 +69,7 @@ class PretrainVisionTransformerEncoder(nn.Module):
         if use_learnable_pos_emb:
             trunc_normal_(self.pos_embed, std=.02)
 
-        if not use_mean_pooling:
+        if use_cls_token:
             trunc_normal_(self.cls_token, std=.02)
         self.apply(self._init_weights)
 
@@ -112,32 +111,25 @@ class PretrainVisionTransformerEncoder(nn.Module):
         return {'pos_embed', 'cls_token'}
 
     def forward(self, x):
-        x = self.patch_embed(x)
-        shuffle = torch.randperm(self.num_patches)
+        shuffle = torch.rand(x.shape[0], self.num_patches).argsort(1).to(x.device)
 
-        if not self.use_mean_pooling:
+        x = self.patch_embed(x)
+        if self.use_cls_token:
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
             x = torch.cat((cls_token, x), dim=1)
-
         x = x + self.pos_embed
 
-        if not self.use_mean_pooling:
-            shuffle = torch.cat([torch.zeros(1, dtype=torch.long), shuffle + 1])
+        visible = shuffle[:, :self.visible_size]
+        if self.use_cls_token:
+            visible = torch.cat([torch.zeros([x.shape[0], 1], dtype=torch.long).to(x.device), visible + 1], dim=1)
 
-        shuffle_token = x[:, shuffle, :]
-
-        if not self.use_mean_pooling:
-            visible_token = shuffle_token[:, :self.visible_size + 1, :]  # Bx(14*14*0.25+1)x768 = Bx50x768
-        else:
-            visible_token = shuffle_token[:, :self.visible_size, :]  # Bx(14*14*0.25)x768 = Bx49x768
-
+        visible_token = x.gather(1, visible.unsqueeze(-1).expand(-1, -1, x.shape[-1]))
         for blk in self.blocks:
             visible_token = blk(visible_token)
 
         # not return cls_token
-        if not self.use_mean_pooling:
+        if self.use_cls_token:
             visible_token = visible_token[:, 1:, :]
-            shuffle = shuffle[1:] - 1
 
         visible_token = self.norm(visible_token)
 
@@ -295,7 +287,8 @@ class PretrainVisionTransformer(nn.Module):
 
     def _mse_loss(self, x, y, masked_index=None):
         if masked_index is not None:
-            return F.mse_loss(x[:, masked_index, :], y[:, masked_index, :], reduction="mean")
+            masked_index = masked_index.unsqueeze(-1).expand(-1, -1, x.shape[-1])
+            return F.mse_loss(x.gather(1, masked_index), y.gather(1, masked_index), reduction="mean")
         else:
             return F.mse_loss(x, y, reduction="mean")
 
@@ -308,7 +301,8 @@ class PretrainVisionTransformer(nn.Module):
 
         mask_tokens = self.mask_token.repeat([B, self.num_patches - self.visible_size, 1])
         decoder_input = torch.cat([encoded_visible_patches, mask_tokens], dim=1)
-        decoder_input = decoder_input[:, shuffle.argsort(), :]
+        decoder_input = decoder_input.gather(
+            1, shuffle.argsort(1).unsqueeze(-1).expand(-1, -1, decoder_input.shape[-1]))
         decoder_input = decoder_input + self.decoder_pos_embed
 
         # decode (encoded_visible_patches + mask_token)
@@ -326,7 +320,7 @@ class PretrainVisionTransformer(nn.Module):
         if self.normalized_pixel:
             target = F.layer_norm(target, target.shape[-1:], eps=1e-6)
 
-        return self._mse_loss(decoder_output, target, masked_index=shuffle[self.visible_size:])
+        return self._mse_loss(decoder_output, target, masked_index=shuffle[:, self.visible_size:])
 
 
 @register_model
