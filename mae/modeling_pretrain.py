@@ -33,13 +33,12 @@ class PretrainVisionTransformerEncoder(nn.Module):
 
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=0, embed_dim=768, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0., norm_layer=nn.LayerNorm, init_values=None, use_mean_pooling=False,
+                 drop_path_rate=0., norm_layer=nn.LayerNorm, init_values=None, use_cls_token=True,
                  mask_ratio=0.75):
         super().__init__()
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
-        self.use_mean_pooling = use_mean_pooling
-        self.use_cls_token = use_cls_token = not use_mean_pooling
+        self.use_cls_token = use_cls_token
 
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
@@ -188,7 +187,7 @@ class PretrainVisionTransformer(nn.Module):
                  init_values=0.,
                  normalized_pixel=False,
                  mask_ratio=0.75,
-                 use_mean_pooling=False,
+                 use_cls_token=True,
                  **kwargs,  # avoid the error from create_fn in timm
                  ):
         super().__init__()
@@ -209,7 +208,7 @@ class PretrainVisionTransformer(nn.Module):
             norm_layer=norm_layer,
             init_values=init_values,
             mask_ratio=mask_ratio,
-            use_mean_pooling=use_mean_pooling,
+            use_cls_token=use_cls_token,
         )
 
         self.decoder = PretrainVisionTransformerDecoder(

@@ -59,7 +59,7 @@ def get_model(args):
         decoder_depth=args.decoder_depth,
         decoder_num_heads=args.decoder_num_heads,
         normalized_pixel=args.normlize_target,
-        use_mean_pooling=args.use_mean_pooling,
+        use_cls_token=args.use_cls_token,
         mask_ratio=args.mask_ratio,
     )
     return model

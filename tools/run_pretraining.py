@@ -57,7 +57,7 @@ def get_args():
                         help='Drop path rate (default: 0.1)')
     parser.add_argument('--normlize_target', default=True, type=bool,
                         help='normalized the target patch pixels')
-    parser.add_argument('--use_mean_pooling', default=False, type=bool,
+    parser.add_argument('--use_cls_token', default=True, type=bool,
                         help='use mean pooling for classification. use cls-token if false.')
 
     # Optimizer parameters
@@ -159,7 +159,7 @@ def get_model(args):
         decoder_depth=args.decoder_depth,
         decoder_num_heads=args.decoder_num_heads,
         normalized_pixel=args.normlize_target,
-        use_mean_pooling=args.use_mean_pooling,
+        use_cls_token=args.use_cls_token,
         mask_ratio=args.mask_ratio,
     )
 

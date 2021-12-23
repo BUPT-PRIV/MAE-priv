@@ -140,7 +140,7 @@ def get_args():
     parser.add_argument('--model_key', default='model|module', type=str)
     parser.add_argument('--model_prefix', default='', type=str)
     parser.add_argument('--init_scale', default=0.001, type=float)
-    parser.add_argument('--use_mean_pooling', default=False, type=bool)
+    parser.add_argument('--use_cls_token', default=True, type=bool)
 
     # Dataset parameters
     parser.add_argument('--data_path', default='', type=str,
@@ -310,7 +310,7 @@ def main(args, ds_init):
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
         attn_drop_rate=args.attn_drop_rate,
-        use_mean_pooling=args.use_mean_pooling,
+        use_cls_token=args.use_cls_token,
         init_scale=args.init_scale,
         lin_probe=True,
     )

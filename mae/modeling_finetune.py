@@ -40,21 +40,18 @@ class VisionTransformer(nn.Module):
                  norm_layer=nn.LayerNorm,
                  init_values=0.,
                  init_scale=0.,
-                 use_mean_pooling=False,
+                 use_cls_token=True,
                  lin_probe=False):
         super().__init__()
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
-        self.use_mean_pooling = use_mean_pooling
-        self.use_cls_token = use_cls_token = not use_mean_pooling
+        self.use_cls_token = use_cls_token
 
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
         self.num_patches = num_patches = self.patch_embed.num_patches
 
-        if use_mean_pooling:
-            self.cls_token = None
-        else:
+        if use_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         # 2D sine-cosine positional embeddings
@@ -78,7 +75,7 @@ class VisionTransformer(nn.Module):
 
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-        if not use_mean_pooling:
+        if use_cls_token:
             trunc_normal_(self.cls_token, std=.02)
         trunc_normal_(self.head.weight, std=.02)
         self.apply(self._init_weights)
@@ -113,7 +110,7 @@ class VisionTransformer(nn.Module):
         x = self.patch_embed(x)
         B, _, _ = x.size()
 
-        if not self.use_mean_pooling:
+        if self.use_cls_token:
             cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
             x = torch.cat((cls_tokens, x), dim=1)
         if self.pos_embed is not None:
@@ -123,10 +120,10 @@ class VisionTransformer(nn.Module):
         for blk in self.blocks:
             x = blk(x)
 
-        if self.use_mean_pooling:
-            x = x.mean(1)
-        else:
+        if self.use_cls_token:
             x = x[:, 0]
+        else:
+            x = x.mean(1)
 
         return self.fc_norm(x)
 

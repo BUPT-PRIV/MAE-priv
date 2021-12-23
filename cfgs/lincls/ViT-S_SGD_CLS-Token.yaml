@@ -2,7 +2,7 @@ output_dir: 'output/lincls/vit_small_patch16_224_CLS-Token'
 
 # Architecture
 model: vit_small_patch16_224
-use_mean_pooling: False # not use cls-token
+use_cls_token: True # not use cls-token
 
 # Train
 epochs: 90

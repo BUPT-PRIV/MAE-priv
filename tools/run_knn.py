@@ -60,7 +60,7 @@ def extract_feature_pipeline(args):
 
     model = create_model(
         args.model,
-        use_mean_pooling=args.use_mean_pooling,
+        use_cls_token=args.use_cls_token,
     )
 
     # load model
@@ -270,7 +270,7 @@ if __name__ == '__main__':
                         help='Name of model to train')
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size')
-    parser.add_argument('--use_mean_pooling', default=False, type=bool)
+    parser.add_argument('--use_cls_token', default=True, type=bool)
     parser.add_argument('--finetune', default=None, type=str)
 
     args_config, remaining = config_parser.parse_known_args()

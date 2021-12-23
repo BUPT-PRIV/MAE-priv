@@ -4,7 +4,7 @@ output_dir: 'output/pretrain/small_baseline/vit_small_100e_patch16_224_GAP'
 model: pretrain_mae_small_patch16_224
 decoder_dim: 192
 decoder_depth: 4
-use_mean_pooling: True
+use_cls_token: False
 normlize_target: True
 mask_ratio: 0.75
 

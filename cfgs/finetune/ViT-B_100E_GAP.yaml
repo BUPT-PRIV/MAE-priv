@@ -2,7 +2,7 @@ output_dir: 'output/finetune/vit_base_patch16_224_GAP_pretrain400'
 
 # Architecture
 model: vit_base_patch16_224
-use_mean_pooling: True # not use cls-token
+use_cls_token: False # not use cls-token
 drop_path: 0.1
 
 # Train

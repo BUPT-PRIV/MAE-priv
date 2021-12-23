@@ -2,7 +2,7 @@ output_dir: 'output/finetune/vit_small_patch16_224_GAP_erasing'
 
 # Architecture
 model: vit_small_patch16_224
-use_mean_pooling: True # not use cls-token
+use_cls_token: False # not use cls-token
 
 # Train
 epochs: 50
