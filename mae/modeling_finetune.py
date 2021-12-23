@@ -16,16 +16,6 @@ from utils.layers import drop_path, to_2tuple, trunc_normal_
 from utils.registry import register_model
 
 
-def _cfg(url='', **kwargs):
-    return {
-        'url': url,
-        'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
-        'crop_pct': .9, 'interpolation': 'bicubic',
-        'mean': (0.5, 0.5, 0.5), 'std': (0.5, 0.5, 0.5),
-        **kwargs
-    }
-
-
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
     """
@@ -328,7 +318,6 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
     model = VisionTransformer(
         patch_size=16, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -337,7 +326,6 @@ def vit_base_patch16_224(pretrained=False, **kwargs):
     model = VisionTransformer(
         patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -346,7 +334,6 @@ def vit_base_patch16_384(pretrained=False, **kwargs):
     model = VisionTransformer(
         img_size=384, patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -355,7 +342,6 @@ def vit_large_patch16_224(pretrained=False, **kwargs):
     model = VisionTransformer(
         patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -364,7 +350,6 @@ def vit_large_patch16_384(pretrained=False, **kwargs):
     model = VisionTransformer(
         img_size=384, patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -373,5 +358,4 @@ def vit_large_patch16_512(pretrained=False, **kwargs):
     model = VisionTransformer(
         img_size=512, patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    model.default_cfg = _cfg()
     return model

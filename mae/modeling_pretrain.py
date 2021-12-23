@@ -13,7 +13,7 @@ import torch.nn.functional as F
 
 from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
-from .modeling_finetune import Block, _cfg, PatchEmbed
+from .modeling_finetune import Block, PatchEmbed
 
 
 def trunc_normal_(tensor, mean=0., std=1.):
@@ -342,7 +342,6 @@ def pretrain_mae_tiny_patch16_224(decoder_dim, decoder_depth, decoder_num_heads,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -365,7 +364,6 @@ def pretrain_mae_small_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -388,7 +386,6 @@ def pretrain_mae_base_patch16_224(decoder_dim, decoder_depth, decoder_num_heads,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -411,7 +408,6 @@ def pretrain_mae_large_patch16_224(decoder_dim, decoder_depth, decoder_num_heads
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -434,7 +430,6 @@ def pretrain_mae_huge_patch14_224(decoder_dim, decoder_depth, decoder_num_heads,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
-    model.default_cfg = _cfg()
     return model
 
 
@@ -457,5 +452,4 @@ def pretrain_mae_giant_patch14_224(decoder_dim, decoder_depth, decoder_num_heads
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs)
-    model.default_cfg = _cfg()
     return model
