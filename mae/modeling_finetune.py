@@ -196,7 +196,6 @@ class VisionTransformer(nn.Module):
                  drop_path_rate=0.,
                  norm_layer=nn.LayerNorm,
                  init_values=0.,
-                 use_learnable_pos_emb=False,
                  init_scale=0.,
                  use_mean_pooling=False,
                  lin_probe=False):
@@ -214,11 +213,8 @@ class VisionTransformer(nn.Module):
         else:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
-        if use_learnable_pos_emb:
-            self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
-        else:
-            # sine-cosine positional embeddings is on the way
-            self.pos_embed = self.build_2d_sincos_position_embedding(embed_dim)
+        # 2D sine-cosine positional embeddings
+        self.pos_embed = self.build_2d_sincos_position_embedding(embed_dim)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -233,9 +229,6 @@ class VisionTransformer(nn.Module):
         self.lin_probe = lin_probe
 
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
-
-        if use_learnable_pos_emb:
-            trunc_normal_(self.pos_embed, std=.02)
 
         if not use_mean_pooling:
             trunc_normal_(self.cls_token, std=.02)
