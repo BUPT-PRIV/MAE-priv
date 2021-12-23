@@ -89,6 +89,11 @@ def get_args():
     parser.add_argument('--warmup_steps', type=int, default=-1, metavar='N',
                         help='epochs to warmup LR, if scheduler supports')
 
+    parser.add_argument('--filter_bias_and_bn', action='store_true',
+                        help='Filter bias and bn without weight decay.')
+    parser.add_argument('--no_filter_bias_and_bn', action='store_false', dest='filter_bias_and_bn')
+    parser.set_defaults(filter_bias_and_bn=True)
+
     # Augmentation parameters
     parser.add_argument('--hflip', type=float, default=0.5,
                         help='horizontal flip (default: 0.5)')
@@ -235,8 +240,7 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
-    optimizer = create_optimizer(
-        args, model_without_ddp)
+    optimizer = create_optimizer(args, model_without_ddp, filter_bias_and_bn=args.filter_bias_and_bn)
     loss_scaler = NativeScaler()
 
     print("Use step level LR & WD scheduler!")
@@ -311,7 +315,7 @@ def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, optimizer: to
         if lr_schedule_values is not None or wd_schedule_values is not None:
             for i, param_group in enumerate(optimizer.param_groups):
                 if lr_schedule_values is not None:
-                    param_group["lr"] = lr_schedule_values[it] * param_group["lr_scale"]
+                    param_group["lr"] = lr_schedule_values[it] * param_group.get("lr_scale", 1.0)
                 if wd_schedule_values is not None and param_group["weight_decay"] > 0:
                     param_group["weight_decay"] = wd_schedule_values[it]
 
