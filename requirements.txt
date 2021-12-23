@@ -1,7 +1,6 @@
 apex
 deepspeed
 einops
-fvcore
 numpy
 Pillow
 PyYAML
