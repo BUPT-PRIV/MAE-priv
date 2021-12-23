@@ -258,10 +258,6 @@ class PretrainVisionTransformer(nn.Module):
     def no_weight_decay(self):
         return {'pos_embed', 'cls_token', 'mask_token'}
 
-    @torch.jit.ignore
-    def decoder_weight_decay(self):
-        return {'encoder_to_decoder'}
-
     def _mse_loss(self, x, y, masked_index=None):
         if masked_index is not None:
             masked_index = masked_index.unsqueeze(-1).expand(-1, -1, x.shape[-1])
