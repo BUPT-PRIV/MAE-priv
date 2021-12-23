@@ -1,5 +1,4 @@
 import _init_paths
-from mae import modeling_pretrain
 
 import argparse
 import os
@@ -14,6 +13,8 @@ from einops import rearrange
 from utils import create_model
 from utils.data_constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from utils.datasets import DataAugmentationForMAE
+
+from mae import modeling_pretrain
 
 
 def get_args():

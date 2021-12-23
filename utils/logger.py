@@ -123,6 +123,7 @@ class MetricLogger(object):
         log_msg = [
             header,
             '[{0' + space_fmt + '}/{1}]',
+            '[{now_time}]',
             'eta: {eta}',
             '{meters}',
             'time: {time}',
@@ -133,6 +134,7 @@ class MetricLogger(object):
         log_msg = self.delimiter.join(log_msg)
         MB = 1024.0 * 1024.0
         for obj in iterable:
+            now_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
             data_time.update(time.time() - end)
             yield obj
             iter_time.update(time.time() - end)
@@ -143,12 +145,14 @@ class MetricLogger(object):
                     print(log_msg.format(
                         i, len(iterable), eta=eta_string,
                         meters=str(self),
+                        now_time=now_time,
                         time=str(iter_time), data=str(data_time),
                         memory=torch.cuda.max_memory_allocated() / MB))
                 else:
                     print(log_msg.format(
                         i, len(iterable), eta=eta_string,
                         meters=str(self),
+                        now_time=now_time,
                         time=str(iter_time), data=str(data_time)))
             i += 1
             end = time.time()

@@ -39,17 +39,15 @@ class VisionTransformer(nn.Module):
                  drop_path_rate=0.,
                  norm_layer=nn.LayerNorm,
                  init_values=0.,
-                 init_scale=0.,
+                 init_scale=1.,
                  use_cls_token=True,
                  lin_probe=False):
         super().__init__()
         self.num_classes = num_classes
-        self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.use_cls_token = use_cls_token
 
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
-        self.num_patches = num_patches = self.patch_embed.num_patches
 
         if use_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -71,14 +69,12 @@ class VisionTransformer(nn.Module):
                 init_values=init_values)
             for i in range(depth)])
         self.fc_norm = nn.BatchNorm1d(embed_dim, affine=False) if lin_probe else norm_layer(embed_dim)
-        self.lin_probe = lin_probe
 
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
+        self.apply(self._init_weights)
         if use_cls_token:
             trunc_normal_(self.cls_token, std=.02)
-        trunc_normal_(self.head.weight, std=.02)
-        self.apply(self._init_weights)
 
         self.head.weight.data.mul_(init_scale)
         self.head.bias.data.mul_(init_scale)
@@ -86,11 +82,8 @@ class VisionTransformer(nn.Module):
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
+            if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
 
     def get_num_layers(self):
         return len(self.blocks)
@@ -99,23 +92,12 @@ class VisionTransformer(nn.Module):
     def no_weight_decay(self):
         return {'pos_embed', 'cls_token'}
 
-    def get_classifier(self):
-        return self.head
-
-    def reset_classifier(self, num_classes, global_pool=''):
-        self.num_classes = num_classes
-        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
-
     def forward_features(self, x):
         x = self.patch_embed(x)
-        B, _, _ = x.size()
-
         if self.use_cls_token:
-            cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+            cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
             x = torch.cat((cls_tokens, x), dim=1)
-        if self.pos_embed is not None:
-            x = x + self.pos_embed.expand(B, -1, -1).type_as(x).to(x.device).clone().detach()
-        x = self.pos_drop(x)
+        x = self.pos_drop(x + self.pos_embed)
 
         for blk in self.blocks:
             x = blk(x)

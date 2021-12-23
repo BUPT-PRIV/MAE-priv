@@ -118,7 +118,7 @@ def build_transform(is_train, args):
                 args.crop_pct = 1.0
         size = int(args.input_size / args.crop_pct)
         t.append(
-            transforms.Resize(size, interpolation=3),  # to maintain same ratio w.r.t. 224 images
+            transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC),  # to maintain same ratio w.r.t. 224 images
         )
         t.append(transforms.CenterCrop(args.input_size))
 

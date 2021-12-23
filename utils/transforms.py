@@ -143,7 +143,7 @@ class RandomResizedCropAndInterpolation:
             interpolation = random.choice(self.interpolation)
         else:
             interpolation = self.interpolation
-        return F.resized_crop(img, i, j, h, w, self.size, interpolation)
+        return F.resized_crop(img, i, j, h, w, self.size, F._interpolation_modes_from_int(interpolation))
 
     def __repr__(self):
         if isinstance(self.interpolation, (tuple, list)):
