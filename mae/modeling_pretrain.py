@@ -12,8 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from utils.registry import register_model
-from .modeling_finetune import Block, PatchEmbed
 
+from .layers import Block, PatchEmbed
 from .utils import build_2d_sincos_position_embedding
 
 
