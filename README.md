@@ -13,7 +13,7 @@ This is an unofficial PyTorch implementation of [Masked Autoencoders Are Scalabl
 - [ ] more results
 - [ ] more datasets
 - [ ] transfer learning for detection and segmentation
-- [ ] multi-nodes training
+- [x] multi-nodes training
 - [ ] ...
 
 ## Main Result

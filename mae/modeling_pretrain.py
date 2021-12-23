@@ -5,6 +5,7 @@
 # https://github.com/facebookresearch/deit
 # https://github.com/facebookresearch/dino
 # --------------------------------------------------------'
+import math
 from functools import partial
 
 import torch
@@ -158,6 +159,7 @@ class PretrainVisionTransformer(nn.Module):
                  normalized_pixel=False,
                  mask_ratio=0.75,
                  use_cls_token=True,
+                 moco_v3_init=False,
                  **kwargs,  # avoid the error from create_fn in timm
                  ):
         super().__init__()
@@ -207,6 +209,17 @@ class PretrainVisionTransformer(nn.Module):
         self.register_buffer('decoder_pos_embed', pos_embed)
 
         trunc_normal_(self.mask_token, std=.02)
+
+        if moco_v3_init:
+            # moco v3 weight initialization
+            for name, m in self.named_modules():
+                if isinstance(m, nn.Linear):
+                    if 'qkv' in name:
+                        # treat the weights of Q, K, V separately
+                        val = math.sqrt(6. / float(m.weight.shape[0] // 3 + m.weight.shape[1]))
+                        nn.init.uniform_(m.weight, -val, val)
+            nn.init.normal_(self.encoder.cls_token, std=1e-6)
+            nn.init.normal_(self.mask_token, std=1e-6)
 
     @torch.jit.ignore
     def no_weight_decay(self):

@@ -59,6 +59,8 @@ def get_args():
                         help='normalized the target patch pixels')
     parser.add_argument('--use_cls_token', default=True, type=bool,
                         help='use mean pooling for classification. use cls-token if false.')
+    parser.add_argument('--moco_v3_init', action='store_true',
+                        help='use moco v3 weight initialization.')
 
     # Optimizer parameters
     parser.add_argument('--opt', default='adamw', type=str, metavar='OPTIMIZER',
@@ -166,6 +168,7 @@ def get_model(args):
         normalized_pixel=args.normlize_target,
         use_cls_token=args.use_cls_token,
         mask_ratio=args.mask_ratio,
+        moco_v3_init=args.moco_v3_init,
     )
 
     return model
