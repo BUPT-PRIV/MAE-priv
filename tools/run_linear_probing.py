@@ -149,7 +149,7 @@ def get_args():
                         help='dataset path for evaluation')
     parser.add_argument('--nb_classes', default=1000, type=int,
                         help='number of the classification types')
-    parser.add_argument('--imagenet_default_mean_and_std', default=True, action='store_true')
+    parser.add_argument('--imagenet_inception_mean_and_std', action='store_true')
 
     parser.add_argument('--data_set', default='IMNET', choices=['CIFAR', 'IMNET', 'image_folder'],
                         type=str, help='ImageNet dataset path')
@@ -192,11 +192,14 @@ def get_args():
 
     parser.add_argument('--enable_deepspeed', action='store_true', default=False)
 
-    parser.add_argument('--log-wandb', action='store_true', default=False,
+    parser.add_argument('--log_wandb', action='store_true',
                         help='log training and validation metrics to wandb')
-    parser.add_argument('--wandb-project', default=None, type=str,
+    parser.add_argument('--no_log_wandb', action='store_false', dest='log_wandb')
+    parser.set_defaults(log_wandb=True)
+
+    parser.add_argument('--wandb_project', default=None, type=str,
                         help='log training and validation metrics to wandb')
-    parser.add_argument('--wandb-entity', default=None, type=str,
+    parser.add_argument('--wandb_entity', default=None, type=str,
                         help='user or team name of wandb')
 
     # Do we have a config file to parse?

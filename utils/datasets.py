@@ -17,9 +17,8 @@ from .dataset_folder import ImageFolder
 
 class DataAugmentationForMAE(object):
     def __init__(self, args):
-        imagenet_default_mean_and_std = args.imagenet_default_mean_and_std
-        mean = IMAGENET_INCEPTION_MEAN if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_MEAN
-        std = IMAGENET_INCEPTION_STD if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_STD
+        mean = IMAGENET_INCEPTION_MEAN if args.imagenet_inception_mean_and_std else IMAGENET_DEFAULT_MEAN
+        std = IMAGENET_INCEPTION_STD if args.imagenet_inception_mean_and_std else IMAGENET_DEFAULT_STD
 
         trans = [transforms.RandomResizedCrop(args.input_size)]
         if args.hflip > 0.0:
@@ -84,9 +83,8 @@ def build_dataset(is_train, args):
 
 def build_transform(is_train, args):
     resize_im = args.input_size > 32
-    imagenet_default_mean_and_std = args.imagenet_default_mean_and_std
-    mean = IMAGENET_INCEPTION_MEAN if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_MEAN
-    std = IMAGENET_INCEPTION_STD if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_STD
+    mean = IMAGENET_INCEPTION_MEAN if args.imagenet_inception_mean_and_std else IMAGENET_DEFAULT_MEAN
+    std = IMAGENET_INCEPTION_STD if args.imagenet_inception_mean_and_std else IMAGENET_DEFAULT_STD
 
     if is_train:
         # this should always dispatch to transforms_imagenet_train

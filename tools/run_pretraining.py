@@ -98,15 +98,18 @@ def get_args():
     # Dataset parameters
     parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/train', type=str,
                         help='dataset path')
-    parser.add_argument('--imagenet_default_mean_and_std', default=True, action='store_true')
+    parser.add_argument('--imagenet_inception_mean_and_std', action='store_true')
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--log-wandb', default=False, action='store_true',
+    parser.add_argument('--log_wandb', action='store_true',
                         help='log training and validation metrics to wandb')
-    parser.add_argument('--wandb-project', default=None, type=str,
+    parser.add_argument('--no_log_wandb', action='store_false', dest='log_wandb')
+    parser.set_defaults(log_wandb=True)
+
+    parser.add_argument('--wandb_project', default=None, type=str,
                         help='log training and validation metrics to wandb')
-    parser.add_argument('--wandb-entity', default=None, type=str,
+    parser.add_argument('--wandb_entity', default=None, type=str,
                         help='user or team name of wandb')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
@@ -121,8 +124,7 @@ def get_args():
     parser.add_argument('--num_workers', default=10, type=int)
     parser.add_argument('--pin_mem', action='store_true',
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
-    parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem',
-                        help='')
+    parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem')
     parser.set_defaults(pin_mem=True)
 
     # distributed training parameters

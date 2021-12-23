@@ -28,7 +28,7 @@ def get_args():
     parser.add_argument('--model_path', type=str, help='checkpoint path of model')
     parser.add_argument('--input_size', default=224, type=int, help='images input size for backbone')
     parser.add_argument('--device', default='cuda', help='device to use')
-    parser.add_argument('--imagenet_default_mean_and_std', default=True, action='store_true')
+    parser.add_argument('--imagenet_inception_mean_and_std', action='store_true')
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='ratio of the visual tokens/patches need be masked')
 
