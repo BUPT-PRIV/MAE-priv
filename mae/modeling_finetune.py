@@ -12,8 +12,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.layers import drop_path, to_2tuple, trunc_normal_
+from utils.layers import drop_path, to_2tuple
 from utils.registry import register_model
+
+
+trunc_normal_ = nn.init.trunc_normal_
 
 
 class DropPath(nn.Module):

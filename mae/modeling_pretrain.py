@@ -11,13 +11,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.layers import trunc_normal_ as __call_trunc_normal_
 from utils.registry import register_model
 from .modeling_finetune import Block, PatchEmbed
 
 
 def trunc_normal_(tensor, mean=0., std=1.):
-    __call_trunc_normal_(tensor, mean=mean, std=std, a=-std, b=std)
+    nn.init.trunc_normal_(tensor, mean=mean, std=std, a=-std, b=std)
 
 
 __all__ = [
