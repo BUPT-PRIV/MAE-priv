@@ -14,6 +14,8 @@ import torch.nn.functional as F
 from utils.registry import register_model
 from .modeling_finetune import Block, PatchEmbed
 
+from .utils import build_2d_sincos_position_embedding
+
 
 def trunc_normal_(tensor, mean=0., std=1.):
     nn.init.trunc_normal_(tensor, mean=mean, std=std, a=-std, b=std)
@@ -51,7 +53,11 @@ class PretrainVisionTransformerEncoder(nn.Module):
             self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         # 2D sine-cosine positional embeddings
-        self.pos_embed = self.build_2d_sincos_position_embedding(embed_dim)
+        pos_embed = build_2d_sincos_position_embedding(*self.patch_embed.patch_shape, embed_dim)
+        if use_cls_token:
+            pe_token = torch.zeros([1, 1, embed_dim], dtype=torch.float32)
+            pos_embed = torch.cat([pe_token, pos_embed], dim=1)
+        self.register_buffer('pos_embed', pos_embed)
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
         self.blocks = nn.ModuleList([
@@ -65,27 +71,6 @@ class PretrainVisionTransformerEncoder(nn.Module):
         if use_cls_token:
             trunc_normal_(self.cls_token, std=.02)
         self.apply(self._init_weights)
-
-    def build_2d_sincos_position_embedding(self, embed_dim=768, temperature=10000., decode=False):
-        h, w = self.patch_embed.patch_shape
-        grid_w = torch.arange(w, dtype=torch.float32)
-        grid_h = torch.arange(h, dtype=torch.float32)
-        grid_w, grid_h = torch.meshgrid(grid_w, grid_h)
-        assert embed_dim % 4 == 0, 'Embed dimension must be divisible by 4 for 2D sin-cos position embedding'
-        pos_dim = embed_dim // 4
-        omega = torch.arange(pos_dim, dtype=torch.float32) / pos_dim
-        omega = 1. / (temperature ** omega)
-        out_w = torch.einsum('m,d->md', [grid_w.flatten(), omega])
-        out_h = torch.einsum('m,d->md', [grid_h.flatten(), omega])
-        pos_emb = torch.cat([torch.sin(out_w), torch.cos(out_w), torch.sin(out_h), torch.cos(out_h)], dim=1)[None, :, :]
-
-        if self.use_mean_pooling or decode:
-            pos_embed = nn.Parameter(pos_emb)
-        else:
-            pe_token = torch.zeros([1, 1, embed_dim], dtype=torch.float32)
-            pos_embed = nn.Parameter(torch.cat([pe_token, pos_emb], dim=1))
-        pos_embed.requires_grad = False
-        return pos_embed
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -251,7 +236,8 @@ class PretrainVisionTransformer(nn.Module):
 
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
 
-        self.decoder_pos_embed = self.encoder.build_2d_sincos_position_embedding(decoder_embed_dim, decode=True)
+        pos_embed = build_2d_sincos_position_embedding(*self.encoder.patch_embed.patch_shape, decoder_embed_dim)
+        self.register_buffer('decoder_pos_embed', pos_embed)
 
         self.normalized_pixel = normalized_pixel
 
