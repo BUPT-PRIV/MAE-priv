@@ -76,8 +76,6 @@ def get_args():
     parser.add_argument('--weight_decay_end', type=float, default=None, help="""Final value of the
         weight decay. We use a cosine schedule for WD. 
         (Set the same value with args.weight_decay to keep weight decay no change)""")
-    parser.add_argument('--decoder_decay', type=float, default=None,
-                        help='decoder weight decay')
 
     parser.add_argument('--lr', type=float, default=1.5e-4, metavar='LR',
                         help='learning rate (default: 1.5e-4)')
