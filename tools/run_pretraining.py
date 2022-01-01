@@ -58,7 +58,7 @@ def get_args():
     parser.add_argument('--normlize_target', default=True, type=bool,
                         help='normalized the target patch pixels')
     parser.add_argument('--use_cls_token', default=True, type=bool,
-                        help='use mean pooling for classification. use cls-token if false.')
+                        help='use cls-token for classification. use mean pooling if false.')
     parser.add_argument('--batched_shuffle', action='store_true',
                         help='use batched shuffle.')
     parser.add_argument('--no_batched_shuffle', action='store_false', dest='batched_shuffle')
@@ -164,6 +164,7 @@ def get_model(args):
         decoder_num_heads=args.decoder_num_heads,
         normalized_pixel=args.normlize_target,
         use_cls_token=args.use_cls_token,
+        batched_shuffle=args.batched_shuffle,
         mask_ratio=args.mask_ratio,
     )
 
