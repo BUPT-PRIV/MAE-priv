@@ -62,7 +62,7 @@ def get_args():
     parser.add_argument('--batched_shuffle', action='store_true',
                         help='use batched shuffle.')
     parser.add_argument('--no_batched_shuffle', action='store_false', dest='batched_shuffle')
-    parser.set_defaults(log_wandb=True)
+    parser.set_defaults(batched_shuffle=True)
 
     # Optimizer parameters
     parser.add_argument('--opt', default='adamw', type=str, metavar='OPTIMIZER',
