@@ -26,11 +26,12 @@ class PretrainVisionTransformerEncoder(nn.Module):
     """
 
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, depth=12,
-                 num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0., norm_layer=nn.LayerNorm, init_values=None, use_cls_token=True,
-                 mask_ratio=0.75):
+                 num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0.,
+                 attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm, init_values=None,
+                 use_cls_token=True, batched_shuffle=True, mask_ratio=0.75):
         super().__init__()
         self.use_cls_token = use_cls_token
+        self.batched_shuffle = batched_shuffle
 
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
@@ -73,6 +74,8 @@ class PretrainVisionTransformerEncoder(nn.Module):
 
     def forward(self, x):
         shuffle = torch.rand(x.shape[0], self.num_patches).argsort(1).to(x.device)
+        if self.batched_shuffle:
+            shuffle = shuffle[0].expand(x.shape[0], -1)
         visible = shuffle[:, :self.visible_size]
         if self.use_cls_token:
             visible = torch.cat([torch.zeros([x.shape[0], 1], dtype=torch.long).to(x.device), visible + 1], dim=1)
@@ -158,6 +161,7 @@ class PretrainVisionTransformer(nn.Module):
                  normalized_pixel=False,
                  mask_ratio=0.75,
                  use_cls_token=True,
+                 batched_shuffle=True,
                  **kwargs,  # avoid the error from create_fn in timm
                  ):
         super().__init__()
@@ -178,6 +182,7 @@ class PretrainVisionTransformer(nn.Module):
             init_values=init_values,
             mask_ratio=mask_ratio,
             use_cls_token=use_cls_token,
+            batched_shuffle=batched_shuffle,
         )
 
         self.decoder = PretrainVisionTransformerDecoder(
