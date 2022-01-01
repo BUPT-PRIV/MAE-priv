@@ -19,5 +19,4 @@ cutmix: 0.0
 #reprob: 0.25
 
 # Wandb
-log_wandb: True
 wandb_project: 'MAE-Linear_Probe'
