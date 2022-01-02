@@ -112,7 +112,7 @@ sh run_knn.sh \
 
 ### Visualization of Restruction
 
-#### ViT-Small Pretrained by 400 Epochs.
+#### ViT-Base Pretrained by 400 Epochs.
 
 ```shell
 python tools/run_mae_vis.py \
@@ -121,6 +121,17 @@ python tools/run_mae_vis.py \
 	--model_path /path/to/pretrain/model \
 	--img_path /path/to/image
 ```
+
+### Visualization of Restruction
+
+#### ViT-Small w/ CLS-Token Pretrained by 100 Epochs.
+
+python tools/vit_explain.py \
+    --config cfgs/finetune/ViT-S_50E_CLS-Token.yaml \
+    --finetune /path/to/pretrain/model \
+    --image_path /path/to/image \
+    --head_fusion max \
+    --discard_ratio 0.9
 
 ### License
 
