@@ -221,8 +221,7 @@ def get_args():
             parser = deepspeed.add_config_arguments(parser)
             ds_init = deepspeed.initialize
         except:
-            print("Please 'pip install deepspeed==0.4.0'")
-            exit(0)
+            raise ImportError("Please 'pip install deepspeed==0.4.0'")
     else:
         ds_init = None
 
@@ -593,8 +592,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         loss_value = loss.item()
 
         if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value), force=True)
-            sys.exit(1)
+            raise ValueError(f"Loss is {loss_value}, stopping training")
 
         if loss_scaler is None:
             loss /= update_freq

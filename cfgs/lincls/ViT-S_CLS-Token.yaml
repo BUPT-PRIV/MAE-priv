@@ -1,0 +1,22 @@
+output_dir: 'output/lincls/vit_small_patch16_224_CLS-Token'
+
+# Architecture
+model: vit_small_patch16_224
+use_cls_token: True # not use cls-token
+
+# Train
+epochs: 90
+opt: lars
+lr: 0.1
+weight_decay: 0.0
+warmup_epochs: 10
+batch_size: 2048
+dist_eval: True
+
+# Data Aug
+mixup: 0.0
+cutmix: 0.0
+#reprob: 0.25
+
+# Wandb
+wandb_project: 'MAE-Linear_Probe'

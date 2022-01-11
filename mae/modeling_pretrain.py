@@ -205,7 +205,7 @@ class PretrainVisionTransformer(nn.Module):
         self.num_patches = self.encoder.num_patches
         self.visible_size = self.encoder.visible_size
 
-        self.encoder_to_decoder = nn.Linear(encoder_embed_dim, decoder_embed_dim, bias=False)
+        self.encoder_to_decoder = nn.Linear(encoder_embed_dim, decoder_embed_dim)
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
 
         pos_embed = build_2d_sincos_position_embedding(*self.encoder.patch_embed.patch_shape, decoder_embed_dim)
